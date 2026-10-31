@@ -62,9 +62,43 @@ const backHTML = () => '<div class="tile v back"></div>';
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem('domino-settings') || '{}'); } catch (e) { return {}; }
 }
-const S = Object.assign({ professor: true, spy: false, colors: true, speed: 1000, lessonDone: -1 }, loadSettings());
+const S = Object.assign(
+  { professor: true, spy: false, colors: true, speed: 1000, lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
+  loadSettings()
+);
 function saveSettings() {
   try { localStorage.setItem('domino-settings', JSON.stringify(S)); } catch (e) { /* sem armazenamento: tudo bem */ }
+}
+
+/* -------- Nome das pedras de lados iguais (6-6, 5-5…): carrão, carroça, bucha… -------- */
+const DOUBLE_NAMES = {
+  carrao: { s: 'carrão', p: 'carrões', g: 'o' },
+  carroca: { s: 'carroça', p: 'carroças', g: 'a' },
+  bucha: { s: 'bucha', p: 'buchas', g: 'a' },
+};
+function pluralize(w) {
+  if (/ão$/.test(w)) return w.replace(/ão$/, 'ões');
+  if (/[rz]$/.test(w)) return w + 'es';
+  if (/s$/.test(w)) return w;
+  return w + 's';
+}
+// Devolve as palavras prontas (com artigos) para usar numa frase. No modo aleatório,
+// cada chamada sorteia um nome — chame uma vez por frase para manter a frase coerente.
+function W() {
+  let base;
+  if (S.doubleName === 'outro' && S.customName.trim()) {
+    const n = S.customName.trim().toLowerCase().replace(/[<>&"']/g, '');
+    base = { s: n, p: pluralize(n), g: S.customGender === 'a' ? 'a' : 'o' };
+  } else if (S.doubleName === 'aleatorio') {
+    const ks = Object.keys(DOUBLE_NAMES);
+    base = DOUBLE_NAMES[ks[Math.floor(Math.random() * ks.length)]];
+  } else base = DOUBLE_NAMES[S.doubleName] || DOUBLE_NAMES.carrao;
+  const f = base.g === 'a';
+  return {
+    s: base.s, p: base.p, S: cap(base.s), P: cap(base.p),
+    o: f ? 'a' : 'o', um: f ? 'uma' : 'um', do: f ? 'da' : 'do', dos: f ? 'das' : 'dos',
+    ele: f ? 'ela' : 'ele', preso: f ? 'presa' : 'preso',
+  };
 }
 
 /* ---------------- Estado do jogo ---------------- */
@@ -97,7 +131,7 @@ function newHand() {
   say(
     `🃏 <b>Mão ${G.handNo}</b> — cada um recebeu 7 pedras. ` +
       (G.mustSix
-        ? `Quem tem a carroça de sena (6-6) começa: <b>${SEAT[start]}</b>.`
+        ? `Quem tem ${dn6()} começa: <b>${SEAT[start]}</b>.`
         : `Quem ganhou a mão anterior começa com qualquer pedra: <b>${SEAT[start]}</b>.`),
     'tip'
   );
@@ -132,10 +166,14 @@ function resultEnds(m) {
   return m.side === 'L' ? [otherSide(m.t, L), R] : [L, otherSide(m.t, R)];
 }
 
+// "o carrão de sena (6-6)" / "a carroça de sena (6-6)"
+function dn6() { const w = W(); return `${w.o} ${w.s} de sena (6-6)`; }
+
 function batidaType(t, e) {
   const [L, R] = e;
-  if (isDouble(t) && L === R && t.a === L) return { name: 'cruzada', pts: 4, desc: 'uma carroça que servia nas duas pontas' };
-  if (isDouble(t)) return { name: 'carroça', pts: 2, desc: 'batida com carroça' };
+  const w = W();
+  if (isDouble(t) && L === R && t.a === L) return { name: 'cruzada', pts: 4, desc: `${w.um} ${w.s} que servia nas duas pontas` };
+  if (isDouble(t)) return { name: w.s, pts: 2, desc: `batida com ${w.s}` };
   if (L !== R && has(t, L) && has(t, R)) return { name: 'lá-e-lô', pts: 3, desc: 'a pedra servia nas duas pontas' };
   return { name: 'batida simples', pts: 1, desc: 'batida com pedra comum' };
 }
@@ -195,10 +233,10 @@ function evaluate(p) {
       const bn = cnt(t.a) >= cnt(t.b) ? t.a : t.b;
       const best = cnt(bn);
       s += best * 3 + pipsOf(t) * 0.4 + (isDouble(t) ? 4 : 0);
-      if (G.mustSix) why.push('Na primeira mão, quem tem a carroça de sena (6-6) é obrigado a começar com ela.');
+      if (G.mustSix) { const w = W(); why.push(`Na primeira mão, quem tem ${w.o} ${w.s} de sena (6-6) é obrigado a começar com ${w.ele}.`); }
       else {
         why.push(`Você tem ${best} pedras com o ${nn(bn)}. Começar pelo número que você mais tem deixa você repetir esse número e mostra ao parceiro qual é o seu jogo.`);
-        if (isDouble(t)) why.push('Sair com carroça é ótimo: carroça só encaixa num número, então é a pedra mais difícil de soltar depois.');
+        if (isDouble(t)) { const w = W(); why.push(`Sair com ${w.s} é ótimo: ${w.s} só encaixa num número, então é a pedra mais difícil de soltar depois.`); }
         if (pipsOf(t) >= 8) why.push(`Também tira da mão uma pedra pesada (${pipsOf(t)} pontos).`);
       }
       res.push({ m, s, why });
@@ -218,7 +256,8 @@ function evaluate(p) {
     s += P * 0.6;
     if (isDouble(t)) {
       s += 5;
-      why.push('Se livra de uma carroça: ela só encaixa em um número, então fica cada vez mais difícil de sair.');
+      const w = W();
+      why.push(`Se livra de ${w.um} ${w.s}: ${w.ele} só encaixa em um número, então fica cada vez mais difícil de sair.`);
     }
     if (P >= 8) why.push(`Tira da mão uma pedra pesada (${P} pontos). Se o jogo trancar, pedra pesada na mão faz perder.`);
 
@@ -384,7 +423,7 @@ function humanTurn(moves) {
   let msg;
   if (!e) {
     msg = G.mustSix
-      ? 'Você tem a <b>carroça de sena (6-6)</b>! Na primeira mão, quem tem ela começa. Toque nela para jogar.'
+      ? (() => { const w = W(); return `Você tem ${w.o} <b>${w.s} de sena (6-6)</b>! Na primeira mão, quem tem ${w.ele} começa. Toque na pedra para jogar.`; })()
       : 'Você ganhou a última mão, então <b>começa com a pedra que quiser</b>. Dica: comece pelo número que você mais tem.';
   } else if (moves.length) {
     const n = new Set(moves.map((m) => m.t)).size;
@@ -407,7 +446,7 @@ function onHandClick(id) {
     const el = document.querySelector(`#seat0 .tile[data-id="${id}"]`);
     if (el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
     const e = ends();
-    if (!e && G.mustSix) setProfNow('Na primeira mão, a saída tem que ser com a <b>carroça de sena (6-6)</b>.');
+    if (!e && G.mustSix) setProfNow(`Na primeira mão, a saída tem que ser com <b>${dn6()}</b>.`);
     else if (e) setProfNow(`Essa não encaixa: as pontas são <b>${e[0]}</b> e <b>${e[1]}</b>, e essa pedra tem ${t.a} e ${t.b}. Procure uma pedra que tenha ${e[0]} ou ${e[1]}.`);
     return;
   }
@@ -677,26 +716,27 @@ const seatMap = `
 const LESSONS = [
   {
     title: 'As pedras',
-    html: () => `
+    html: (w) => `
       <p>O dominó tem <b>28 pedras</b>. Cada pedra tem duas metades, e cada metade tem de <b>0 a 6</b> bolinhas.</p>
       <p>Na roda de dominó, os números têm apelidos:</p>
       <div class="demo felt">${[0, 1, 2, 3, 4, 5, 6].map((n) => `<div class="col">${T(n, n)}<span class="lbl">${n}<br><b>${NUM[n]}</b></span></div>`).join('')}</div>
-      <p>As pedras acima, com os dois lados iguais, se chamam <b>carroças</b> (ou buchas). São 7 carroças.</p>
+      <p>As pedras acima, com os dois lados iguais, se chamam <b>${w.p}</b>. São 7 ${w.p}.</p>
+      <div class="box">Cada região chama de um jeito: <b>carrão</b>, <b>carroça</b>, <b>bucha</b>… É tudo a mesma coisa! Você pode escolher o nome que o jogo usa em <b>⚙️ Opções</b>.</div>
       <div class="box gold"><b>Segredo nº 1:</b> cada número aparece em <b>exatamente 7 pedras</b>. Veja o 5 (quina):</div>
       <div class="demo felt">${[0, 1, 2, 3, 4, 5, 6].map((n) => T(Math.min(n, 5), Math.max(n, 5))).join('')}</div>
       <p>Guarde isso! É a base da <b>contagem</b>, a técnica que os bons jogadores usam para "adivinhar" as pedras dos outros.</p>`,
-    quiz: {
+    quiz: (w) => ({
       q: 'Quantas pedras têm o número 3 (terno)?',
       opts: [
-        { html: '6', why: 'Quase! Não esqueça a carroça 3-3.' },
+        { html: '6', why: `Quase! Não esqueça ${w.o} ${w.s} 3-3.` },
         { html: '7', ok: true, why: 'Isso! 0-3, 1-3, 2-3, 3-3, 3-4, 3-5 e 3-6. Todo número aparece em 7 pedras.' },
-        { html: '8', why: 'A carroça 3-3 conta só uma vez. São 7.' },
+        { html: '8', why: `${cap(w.o)} ${w.s} 3-3 conta só uma vez. São 7.` },
       ],
-    },
+    }),
   },
   {
     title: 'A mesa e as duplas',
-    html: () => `
+    html: (w) => `
       <p>O dominó mais comum no Brasil é jogado por <b>4 pessoas em 2 duplas</b>. O seu <b>parceiro</b> senta na sua frente; os adversários ficam dos lados.</p>
       ${seatMap}
       <ul>
@@ -705,82 +745,82 @@ const LESSONS = [
         <li>Você <b>não vê</b> as pedras do parceiro e não pode falar delas. A conversa entre a dupla é feita <b>pelas jogadas</b>.</li>
         <li>Os pontos são da dupla: se o seu parceiro bate, você também ganha.</li>
       </ul>`,
-    quiz: {
+    quiz: (w) => ({
       q: 'Você acabou de jogar. Quem joga agora?',
       opts: [
         { html: 'O parceiro', why: 'Não: entre você e o parceiro sempre joga um adversário.' },
         { html: 'O adversário da Direita', ok: true, why: 'Isso! A ordem é Você → Direita → Parceiro → Esquerda.' },
         { html: 'Quem quiser', why: 'Não, a ordem é sempre a mesma.' },
       ],
-    },
+    }),
   },
   {
     title: 'Como começa',
-    html: () => `
-      <p>Na <b>primeira mão</b> da partida, quem tiver a <b>carroça de sena</b> começa jogando ela no centro da mesa:</p>
+    html: (w) => `
+      <p>Na <b>primeira mão</b> da partida, quem tiver ${w.o} <b>${w.s} de sena</b> começa jogando ${w.ele} no centro da mesa:</p>
       <div class="demo felt">${T(6, 6)}</div>
       <p>Nas mãos seguintes, <b>quem ganhou a mão anterior começa</b>, e pode sair com <b>qualquer pedra</b>.</p>
       <div class="box">💡 Quando puder escolher, saia com o número que você <b>mais tem</b>. Assim você consegue repetir esse número e o parceiro entende qual é o seu jogo.</div>`,
   },
   {
     title: 'Encaixando as pedras',
-    html: () => `
+    html: (w) => `
       <p>A fila de pedras na mesa tem <b>duas pontas</b>. Na sua vez, você joga uma pedra que tenha o <b>mesmo número</b> de uma das pontas, encostando os números iguais.</p>
       <div class="demo felt"><span class="endmark">◀ <b>3</b></span>${T(3, 6, true)}${T(6, 6)}${T(6, 1, true)}<span class="endmark"><b>1</b> ▶</span></div>
       <p>Aqui as pontas são <b>3</b> e <b>1</b>. Você pode jogar qualquer pedra com 3 ou com 1. Se jogar a 1-5 na direita, a nova ponta passa a ser 5:</p>
       <div class="demo felt"><span class="endmark">◀ <b>3</b></span>${T(3, 6, true)}${T(6, 6)}${T(6, 1, true)}${T(1, 5, true)}<span class="endmark"><b>5</b> ▶</span></div>
-      <p>Repare que a <b>carroça entra atravessada</b> (em pé), mas funciona igual: a ponta continua sendo o número dela.</p>`,
-    quiz: {
+      <p>Repare que ${w.o} <b>${w.s} entra atravessad${w.o}</b> (em pé), mas funciona igual: a ponta continua sendo o número dela.</p>`,
+    quiz: (w) => ({
       q: 'As pontas são 3 e 1. Qual destas pedras você pode jogar?',
       opts: [
         { html: T(2, 4, true), why: 'Essa não tem 3 nem 1.' },
         { html: T(1, 5, true), ok: true, why: 'Isso! Ela tem o 1, então encaixa na ponta do 1.' },
-        { html: T(6, 6, true), why: 'A carroça de sena só encaixa onde a ponta é 6.' },
+        { html: T(6, 6, true), why: `${cap(w.o)} ${w.s} de sena só encaixa onde a ponta é 6.` },
       ],
-    },
+    }),
   },
   {
     title: 'Passar a vez (tocar)',
-    html: () => `
+    html: (w) => `
       <p>Se você <b>não tem nenhuma pedra</b> com os números das pontas, você <b>passa a vez</b> (também chamado de "tocar" ou "bater na mesa").</p>
       <p>Se você tem uma pedra que serve, <b>é obrigado a jogar</b> — não pode passar de propósito.</p>
       <div class="box red"><b>Segredo nº 2:</b> passar <b>conta um segredo para a mesa inteira</b>. Se as pontas eram 2 e 5 e você passou, todo mundo agora sabe que você <b>não tem nenhuma pedra com 2 nem com 5</b>.</div>
       <p>Os jogadores experientes <b>anotam de cabeça</b> cada passe. Neste jogo, o painel <b>🕵️ Leitura dos jogadores</b> anota isso pra você.</p>`,
-    quiz: {
+    quiz: (w) => ({
       q: 'As pontas eram 2 e 5 e o adversário passou. O que você descobriu?',
       opts: [
         { html: 'Ele não tem só a pedra 2-5', why: 'Mais que isso: ele não tem NENHUMA pedra com 2 e nenhuma com 5.' },
         { html: 'Ele não tem nenhuma pedra com 2 nem com 5', ok: true, why: 'Exato! Se tivesse qualquer uma, seria obrigado a jogar.' },
         { html: 'Nada, ele pode estar escondendo', why: 'Passar tendo pedra que serve é contra a regra. Então o passe é uma informação certa.' },
       ],
-    },
+    }),
   },
   {
     title: 'Como se ganha',
-    html: () => `
+    html: (w) => `
       <p><b>Bater</b> = jogar a sua última pedra. A dupla de quem bateu ganha pontos, de acordo com a última pedra:</p>
       <table class="pts">
         <tr><th>Batida</th><th>Exemplo</th><th>Pontos</th></tr>
         <tr><td><b>Simples</b> — pedra comum</td><td>pontas 2 e 4, bate com <div class="demo" style="display:inline-flex">${T(4, 1, true)}</div></td><td>1</td></tr>
-        <tr><td><b>Carroça</b> — bate com uma carroça</td><td>pontas 2 e 4, bate com <div class="demo" style="display:inline-flex">${T(4, 4)}</div></td><td>2</td></tr>
+        <tr><td><b>${w.S}</b> — bate com ${w.um} ${w.s}</td><td>pontas 2 e 4, bate com <div class="demo" style="display:inline-flex">${T(4, 4)}</div></td><td>2</td></tr>
         <tr><td><b>Lá-e-lô</b> — a pedra serve nas duas pontas</td><td>pontas 2 e 4, bate com <div class="demo" style="display:inline-flex">${T(2, 4, true)}</div></td><td>3</td></tr>
-        <tr><td><b>Cruzada</b> — carroça que serve nas duas pontas</td><td>pontas 4 e 4, bate com <div class="demo" style="display:inline-flex">${T(4, 4)}</div></td><td>4</td></tr>
+        <tr><td><b>Cruzada</b> — ${w.s} que serve nas duas pontas</td><td>pontas 4 e 4, bate com <div class="demo" style="display:inline-flex">${T(4, 4)}</div></td><td>4</td></tr>
       </table>
       <p><b>Jogo trancado:</b> quando ninguém consegue mais jogar, cada dupla soma as bolinhas das pedras que sobraram. <b>Quem tiver menos ganha 1 ponto.</b></p>
       <p>A partida vai até <b>${TARGET} pontos</b>.</p>
       <div class="box">As regras de pontuação mudam um pouco de região para região. Antes de jogar com a turma, pergunte: "aqui vale lá-e-lô? cruzada vale 4?".</div>`,
-    quiz: {
+    quiz: (w) => ({
       q: 'As pontas são 3 e 6 e você bate com a pedra 3-6. Quanto vale?',
       opts: [
         { html: '1 ponto', why: 'A 3-6 serve nas duas pontas, então não é simples.' },
         { html: '3 pontos (lá-e-lô)', ok: true, why: 'Isso! Pedra que encaixa nas duas pontas é lá-e-lô.' },
-        { html: '4 pontos', why: 'Cruzada (4) é só com carroça.' },
+        { html: '4 pontos', why: `Cruzada (4) é só com ${w.s}.` },
       ],
-    },
+    }),
   },
   {
     title: 'Estratégia 1: a contagem',
-    html: () => `
+    html: (w) => `
       <p>Lembra que cada número está em 7 pedras? Então dá para <b>contar quantas ainda faltam sair</b>:</p>
       <div class="box gold"><b>Faltam com os outros</b> = 7 − (já na mesa) − (na sua mão)</div>
       <p>Exemplo: na mesa já saíram estas pedras com 4:</p>
@@ -789,18 +829,18 @@ const LESSONS = [
       <div class="demo felt">${T(2, 4)}${T(3, 4)}</div>
       <p>4 na mesa + 2 na sua mão = 6. Então <b>só falta 1 pedra de 4</b> (a 4-5) e ela está com algum outro jogador. Se a ponta for 4 e esse jogador já tiver passado no 4… só você consegue jogar ali!</p>
       <p>No jogo, o painel <b>🧮 Contador de pedras</b> faz essa conta pra você até você pegar o jeito.</p>`,
-    quiz: {
+    quiz: (w) => ({
       q: 'Já saíram 4 pedras com o 2 e você tem 2 pedras com 2. Quantas pedras de 2 estão com os outros?',
       opts: [
         { html: '0', why: '4 + 2 = 6, ainda falta uma para chegar a 7.' },
         { html: '1', ok: true, why: 'Isso! 7 − 4 − 2 = 1.' },
         { html: '3', why: 'Faça a conta: 7 − 4 (mesa) − 2 (sua mão).' },
       ],
-    },
+    }),
   },
   {
     title: 'Estratégia 2: como eles "sabem a sua pedra"',
-    html: () => `
+    html: (w) => `
       <p>Não é mágica nem trapaça. Um bom jogador junta <b>três pistas</b>:</p>
       <ol>
         <li><b>Os passes</b> — quem passou não tem aqueles números.</li>
@@ -816,21 +856,21 @@ const LESSONS = [
           <li>Não repita sempre o mesmo número sem necessidade — você está "anunciando" o seu jogo.</li>
           <li>Fique de olho no painel <b>⚠️ O que os adversários já sabem de você</b>.</li>
         </ul></div>`,
-    quiz: {
+    quiz: (w) => ({
       q: 'Você é o jogador da Direita. Parceiro e Esquerda já passaram no 6. Com quem estão as pedras 6-1, 6-2 e 6-4 que faltam (você não tem nenhuma)?',
       opts: [
         { html: 'Com o Parceiro', why: 'Ele passou no 6, então não tem nenhuma pedra com 6.' },
         { html: 'Com o jogador que ainda não passou no 6', ok: true, why: 'Exato! Por eliminação, só pode ser ele. É assim que "sabem a sua pedra".' },
         { html: 'Não dá para saber', why: 'Dá sim! Elimine quem passou e quem é você.' },
       ],
-    },
+    }),
   },
   {
     title: 'Estratégia 3: dicas de ouro',
-    html: () => `
+    html: (w) => `
       <ol>
         <li><b>Saia com o número que você mais tem.</b> Você repete esse número e o parceiro aprende o seu jogo.</li>
-        <li><b>Livre-se das carroças cedo.</b> Carroça só encaixa num número; se esse número acabar, ela fica presa na sua mão.</li>
+        <li><b>Livre-se ${w.dos} ${w.p} cedo.</b> ${w.S} só encaixa num número; se esse número acabar, ${w.ele} fica ${w.preso} na sua mão.</li>
         <li><b>Livre-se das pedras pesadas</b> (6-6, 5-6, 5-5…). Se o jogo trancar, quem tem mais pontos na mão perde.</li>
         <li><b>Mantenha variedade.</b> Quanto mais números diferentes na mão, menos você passa.</li>
         <li><b>Faça o adversário passar.</b> Se o próximo adversário já passou no 3, tente deixar 3 nas pontas.</li>
@@ -842,7 +882,7 @@ const LESSONS = [
   },
   {
     title: 'Hora de jogar!',
-    html: () => `
+    html: (w) => `
       <p>Você vai jogar com a dupla de baixo/cima (azul) contra os adversários dos lados (vermelho). Na tela de jogo:</p>
       <ul>
         <li><b>🎓 Professor</b> — diz o que fazer na sua vez, comenta as jogadas e as deduções.</li>
@@ -875,15 +915,17 @@ function renderLesson() {
   S.lessonDone = Math.max(S.lessonDone, lessonIdx - 1);
   saveSettings();
   const prog = LESSONS.map((_, i) => `<span data-i="${i}" class="${i === lessonIdx ? 'cur' : i <= S.lessonDone ? 'done' : ''}" title="Aula ${i + 1}"></span>`).join('');
+  const w = W();
+  const Q = L.quiz ? L.quiz(w) : null;
   let quiz = '';
-  if (L.quiz) {
-    quiz = `<div class="quiz"><b>❓ Teste rápido:</b> ${L.quiz.q}<div class="opts">${L.quiz.opts.map((o, i) => `<button data-q="${i}">${o.html}</button>`).join('')}</div><div class="fb"></div></div>`;
+  if (Q) {
+    quiz = `<div class="quiz"><b>❓ Teste rápido:</b> ${Q.q}<div class="opts">${Q.opts.map((o, i) => `<button data-q="${i}">${o.html}</button>`).join('')}</div><div class="fb"></div></div>`;
   }
   const last = lessonIdx === LESSONS.length - 1;
   $('#lessons').innerHTML = `<div class="lesson">
     <div class="progress">${prog}</div>
     <h2>Aula ${lessonIdx + 1} de ${LESSONS.length}: ${L.title}</h2>
-    ${L.html()}
+    ${L.html(w)}
     ${quiz}
     <div class="nav">
       <button id="lPrev" ${lessonIdx === 0 ? 'disabled style="opacity:.4"' : ''}>◀ Anterior</button>
@@ -893,7 +935,7 @@ function renderLesson() {
   $('#lessons').querySelectorAll('.progress span').forEach((s) => { s.onclick = () => { lessonIdx = +s.dataset.i; renderLesson(); }; });
   $('#lessons').querySelectorAll('.quiz button').forEach((b) => {
     b.onclick = () => {
-      const o = L.quiz.opts[+b.dataset.q];
+      const o = Q.opts[+b.dataset.q];
       b.classList.add(o.ok ? 'right' : 'wrong');
       $('#lessons .quiz .fb').innerHTML = (o.ok ? '✅ ' : '❌ ') + o.why;
     };
@@ -915,6 +957,31 @@ function startPlaying() {
   window.scrollTo(0, 0);
 }
 
+/* ---------------- Escolha do nome (carrão, carroça, bucha…) ---------------- */
+function renderNamePicker(el) {
+  const opts = [['carrao', 'Carrão'], ['carroca', 'Carroça'], ['bucha', 'Bucha'], ['aleatorio', '🎲 Aleatório'], ['outro', '✏️ Outro']];
+  el.innerHTML = `<span class="np-label">Pedras de lados iguais (6-6, 5-5…) se chamam:</span>
+    <span class="seg">${opts.map(([k, l]) => `<button type="button" data-k="${k}" class="${S.doubleName === k ? 'on' : ''}">${l}</button>`).join('')}</span>
+    <span class="np-custom ${S.doubleName === 'outro' ? '' : 'hidden'}">
+      <select class="np-g"><option value="o">o</option><option value="a">a</option></select>
+      <input class="np-in" type="text" maxlength="20" placeholder="digite o nome">
+    </span>
+    <span class="np-hint">${S.doubleName === 'aleatorio' ? 'O nome muda a cada vez, para você se acostumar com todos.' : `Exemplo: ${dn6()}.`}</span>`;
+  el.querySelector('.np-g').value = S.customGender;
+  el.querySelector('.np-in').value = S.customName;
+  const changed = () => {
+    saveSettings();
+    document.querySelectorAll('.namePicker').forEach(renderNamePicker);
+    render();
+    if (!$('#lessons').classList.contains('hidden')) renderLesson();
+  };
+  el.querySelectorAll('.seg button').forEach((b) => {
+    b.onclick = () => { S.doubleName = b.dataset.k; changed(); };
+  });
+  el.querySelector('.np-g').onchange = (e) => { S.customGender = e.target.value; changed(); };
+  el.querySelector('.np-in').onchange = (e) => { S.customName = e.target.value.trim(); changed(); };
+}
+
 /* ---------------- Inicialização ---------------- */
 function initUI() {
   document.body.classList.toggle('colors', S.colors);
@@ -926,6 +993,7 @@ function initUI() {
   $('#optSpy').onchange = (e) => { S.spy = e.target.checked; saveSettings(); render(); };
   $('#optColors').onchange = (e) => { S.colors = e.target.checked; saveSettings(); render(); if (!$('#lessons').classList.contains('hidden')) renderLesson(); };
   $('#optSpeed').onchange = (e) => { S.speed = +e.target.value; saveSettings(); };
+  renderNamePicker($('#namePicker'));
   $('#btnSettings').onclick = () => $('#settings').classList.toggle('hidden');
   $('#btnLessons').onclick = () => openLessons(Math.min(Math.max(S.lessonDone + 1, 0), LESSONS.length - 1));
   $('#btnNew').onclick = () => {
@@ -942,10 +1010,13 @@ function initUI() {
   showModal(`<h2>Bem-vindo à Escola de Dominó!</h2>
     <p>Aqui você aprende o <b>dominó brasileiro em duplas</b>, do zero: as regras, como contar as pedras e como os bons jogadores "descobrem" as pedras dos outros.</p>
     <p>Durante o jogo, um <b>professor</b> explica cada jogada e dá dicas.</p>
+    <div class="namePicker" id="welcomePicker"></div>
+    <p style="font-size:.85em;opacity:.8">Dá para mudar isso depois em ⚙️ Opções.</p>
     <div class="btns">
       <button class="big primary" id="wLearn">📚 Aprender passo a passo</button>
       <button class="big" id="wPlay">🎮 Já sei o básico, quero jogar</button>
     </div>`);
+  renderNamePicker($('#welcomePicker'));
   $('#wLearn').onclick = () => { hideModal(); openLessons(0); };
   $('#wPlay').onclick = () => { hideModal(); startPlaying(); };
 }

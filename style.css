@@ -324,3 +324,13 @@ table.pts td .demo { margin: 0; padding: 4px; }
   .seat .chips { max-width: 70px; }
   #table { gap: 4px; }
 }
+
+/* ---------- Escolha do nome das pedras dobradas ---------- */
+.namePicker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; width: 100%; }
+#modalBox .namePicker { background: #1d232a; border-radius: 12px; padding: 10px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.seg button { padding: 6px 10px; background: #3a4350; }
+.seg button.on { background: #2e7d32; font-weight: 700; box-shadow: 0 0 0 2px #a5d6a7; }
+.np-custom { display: inline-flex; gap: 4px; }
+.np-custom input, .np-custom select { font: inherit; border-radius: 6px; padding: 4px 6px; border: 0; }
+.np-hint { font-size: .85em; opacity: .8; width: 100%; }
