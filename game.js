@@ -761,7 +761,7 @@ function renderBoard() {
   const py = (y) => (y - minY) * u + pad;
   let html = '';
   for (const it of lay.items) {
-    let cls = `p${it.e.p}`;
+    let cls = `p${it.e.p} ${teamOf(it.e.p) === 0 ? 'us' : 'them'}`;
     if (it.e === G.lastEntry) cls += ' last';
     if (it.e === G.animEntry) cls += ' enter';
     html += `<div class="bt" style="left:${px(it.x)}px;top:${py(it.y)}px">${boardTileHTML(it, cls)}</div>`;
@@ -1011,7 +1011,9 @@ const LESSONS = [
         <li><b>⚠️ O que os adversários sabem de você</b> — veja o que você está entregando!</li>
         <li><b>⚙️ Opções</b> — ligue o <b>modo espiar</b> para ver as pedras de todos e entender as jogadas dos robôs. Quando estiver confiante, <b>desligue o professor</b>.</li>
       </ul>
-      <p>Na mesa, a pedra com borda <span style="color:#42a5f5">azul</span> foi jogada pela sua dupla; <span style="color:#ef5350">vermelha</span>, pelos adversários. A última jogada fica com contorno amarelo.</p>
+      <p>Na mesa, cada pedra ganha um tom bem clarinho de quem jogou:</p>
+      <div class="demo felt"><div class="col">${tileHTML(2, 5, { h: true, cls: 'us' })}<span class="lbl">azulada:<br>sua dupla</span></div><div class="col">${tileHTML(2, 5, { h: true, cls: 'them' })}<span class="lbl">rosada:<br>adversários</span></div></div>
+      <p>A última pedra jogada fica com contorno amarelo.</p>
       <p><b>Bom jogo!</b></p>`,
   },
 ];

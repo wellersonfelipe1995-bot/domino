@@ -152,9 +152,14 @@ main { padding: 10px; }
   margin: 4px 0;
 }
 #board .bt { position: absolute; }
-#board .tile { border-bottom-width: 3px; }
-#board .tile.p0, #board .tile.p2 { border-bottom-color: #42a5f5; }
-#board .tile.p1, #board .tile.p3 { border-bottom-color: #ef5350; }
+/* Quem jogou a pedra: a própria pedra ganha um tom bem clarinho
+   (azulado = sua dupla, rosado = adversários), sem atrapalhar as cores das bolinhas. */
+.tile.us { background: linear-gradient(160deg, #f1f7ff, #d9e8fb); border-color: #7f9cc4; }
+.tile.them { background: linear-gradient(160deg, #fff3f1, #f8dcd8); border-color: #c49690; }
+#board .half { padding: calc(var(--u) * .07); }
+#board .half i.pip { width: 84%; height: 84%; }
+.boardlegend { font-size: .82em; text-align: center; opacity: .9; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; --u: 10px; }
+.boardlegend span { display: inline-flex; align-items: center; gap: 4px; }
 #board .tile.last { box-shadow: 0 0 0 3px #ffd54f, 0 0 14px #ffd54f; }
 #board .tile.enter { animation: drop .7s ease-out; }
 @keyframes drop {
@@ -393,3 +398,4 @@ table.pts td .demo { margin: 0; padding: 4px; }
   white-space: nowrap;
 }
 .endmark b { font-size: 1.3em; color: #ffd54f; }
+.boardlegend .tile { --u: inherit; }
