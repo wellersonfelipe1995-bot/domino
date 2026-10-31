@@ -345,12 +345,7 @@ table.pts { border-collapse: collapse; margin: 8px 0; }
 table.pts td, table.pts th { border: 1px solid #444; padding: 5px 10px; text-align: left; vertical-align: middle; }
 table.pts td .demo { margin: 0; padding: 4px; }
 
-@media (max-width: 600px) {
-  .seat.left, .seat.right { max-width: 72px; font-size: .8em; padding: 2px; }
-  .seat.left .tiles.backs, .seat.right .tiles.backs { display: none; }
-  .seat .chips { max-width: 70px; }
-  #table { gap: 4px; }
-}
+
 
 /* ---------- Escolha do nome das pedras dobradas ---------- */
 .namePicker { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; width: 100%; }
@@ -383,8 +378,15 @@ table.pts td .demo { margin: 0; padding: 4px; }
       "actions actions actions";
     min-height: 0;
   }
-  .seat.left, .seat.right { max-width: none; }
-  .seat.top .tiles.backs { --u: 9px; }
+  #table { gap: 4px; }
+  /* Os três jogadores de cima iguais: nome, pedras viradas em fila e o que eles não têm */
+  .seat.top, .seat.left, .seat.right { max-width: none; font-size: .8em; padding: 3px 2px; }
+  .seat.top .tiles, .seat.left .tiles, .seat.right .tiles { --u: 9px; flex-direction: row; max-width: none; gap: 2px; }
+  .seat.left .tiles .tile.v, .seat.right .tiles .tile.v { flex-direction: column; width: var(--u); height: calc(var(--u) * 2); }
+  .seat.left .tiles .tile.v .half:first-child, .seat.right .tiles .tile.v .half:first-child { border-right: 0; border-bottom: 1px solid #9b917a; }
+  .seat .chips { max-width: none; }
+  .seat.top .tiles:not(.backs), .seat.left .tiles:not(.backs), .seat.right .tiles:not(.backs) { --u: 12px; }
+  .seat .chip { font-size: .9em; padding: 0 5px; }
   #boardWrap { min-height: 160px; }
 }
 
