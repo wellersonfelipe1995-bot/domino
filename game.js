@@ -59,11 +59,13 @@ const T = (a, b, h) => tileHTML(a, b, { h });
 const backHTML = () => '<div class="tile v back"></div>';
 
 /* ---------------- Configurações ---------------- */
-const S = Object.assign(
-  { professor: true, spy: false, colors: true, speed: 1000, lessonDone: -1 },
-  JSON.parse(localStorage.getItem('domino-settings') || '{}')
-);
-function saveSettings() { localStorage.setItem('domino-settings', JSON.stringify(S)); }
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem('domino-settings') || '{}'); } catch (e) { return {}; }
+}
+const S = Object.assign({ professor: true, spy: false, colors: true, speed: 1000, lessonDone: -1 }, loadSettings());
+function saveSettings() {
+  try { localStorage.setItem('domino-settings', JSON.stringify(S)); } catch (e) { /* sem armazenamento: tudo bem */ }
+}
 
 /* ---------------- Estado do jogo ---------------- */
 let G = null;
@@ -456,7 +458,9 @@ function showHint() {
 
 /* ---------------- Fim de mão ---------------- */
 function endHand(r) {
+  if (G.over && G.lastResult === r) { showModal(G.lastModal); bindEndButton(); return; }
   G.over = true;
+  G.lastResult = r;
   render();
   const sums = G.hands.map((h) => h.reduce((a, t) => a + pipsOf(t), 0));
   let title;
@@ -502,12 +506,15 @@ function endHand(r) {
     const won = G.score[0] >= TARGET;
     title = won ? '🏆 Vocês venceram a partida!' : '😤 Os adversários venceram a partida';
     body = body + (won ? '<p>Parabéns! Agora tente jogar com o professor desligado.</p>' : '<p>Não desanime: veja as dicas do professor e tente de novo!</p>');
-    showModal(`<h2>${title}</h2>${body}<div class="btns"><button class="big primary" id="mNext">Nova partida</button></div>`);
-    $('#mNext').onclick = () => { hideModal(); newGame(); };
-  } else {
-    showModal(`<h2>${title}</h2>${body}<div class="btns"><button class="big primary" id="mNext">Próxima mão ▶</button></div>`);
-    $('#mNext').onclick = () => { hideModal(); newHand(); };
   }
+  G.gameOver = gameOver;
+  G.lastModal = `<h2>${title}</h2>${body}<div class="btns"><button class="big primary" id="mNext">${gameOver ? 'Nova partida' : 'Próxima mão ▶'}</button></div>`;
+  showModal(G.lastModal);
+  bindEndButton();
+}
+
+function bindEndButton() {
+  $('#mNext').onclick = () => { hideModal(); if (G.gameOver) newGame(); else newHand(); };
 }
 
 /* ---------------- Interface ---------------- */
@@ -922,10 +929,12 @@ function initUI() {
   $('#btnSettings').onclick = () => $('#settings').classList.toggle('hidden');
   $('#btnLessons').onclick = () => openLessons(Math.min(Math.max(S.lessonDone + 1, 0), LESSONS.length - 1));
   $('#btnNew').onclick = () => {
-    if (G && !confirm('Começar uma nova partida? O placar atual será zerado.')) return;
-    hideModal();
-    closeLessons();
-    newGame();
+    const go = () => { hideModal(); closeLessons(); newGame(); };
+    if (!G) { go(); return; }
+    showModal(`<h2>Nova partida?</h2><p>O placar atual será zerado.</p>
+      <div class="btns"><button class="big primary" id="cYes">Sim, começar de novo</button><button class="big" id="cNo">Continuar esta partida</button></div>`);
+    $('#cYes').onclick = go;
+    $('#cNo').onclick = () => { hideModal(); if (G.over) endHand(G.lastResult); };
   };
   $('#btnHint').onclick = showHint;
   $('#btnPass').onclick = () => { if (G.turn === 0 && !G.over && !legal(0).length) { setProfNow(''); doPass(0); } };
