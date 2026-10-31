@@ -350,26 +350,29 @@ table.pts td .demo { margin: 0; padding: 4px; }
   .demo .endmark { padding: 3px 6px; }
 }
 
-/* No celular: os três jogadores em cima, a mesa ocupa a largura toda */
+/* No celular: parceiro em cima, adversários nas laterais da mesa com o nome
+   escrito de cima para baixo, ocupando o mínimo de largura. */
 @media (max-width: 600px) {
   #table {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "left top right"
-      "board board board"
+      "top top top"
+      "left board right"
       "bottom bottom bottom"
       "actions actions actions";
     min-height: 0;
+    gap: 4px;
   }
-  #table { gap: 4px; }
-  /* Os três jogadores de cima iguais: nome, pedras viradas em fila e o que eles não têm */
-  .seat.top, .seat.left, .seat.right { max-width: none; font-size: .8em; padding: 3px 2px; }
-  .seat.top .tiles, .seat.left .tiles, .seat.right .tiles { --u: 9px; flex-direction: row; max-width: none; gap: 2px; }
-  .seat.left .tiles .tile.v, .seat.right .tiles .tile.v { flex-direction: column; width: var(--u); height: calc(var(--u) * 2); }
-  .seat.left .tiles .tile.v .half:first-child, .seat.right .tiles .tile.v .half:first-child { border-right: 0; border-bottom: 1px solid #9b917a; }
-  .seat .chips { max-width: none; }
-  .seat.top .tiles:not(.backs), .seat.left .tiles:not(.backs), .seat.right .tiles:not(.backs) { --u: 12px; }
-  .seat .chip { font-size: .9em; padding: 0 5px; }
+  .seat { font-size: .8em; padding: 3px 2px; }
+  .seat.top .tiles { --u: 9px; gap: 2px; }
+  .seat.top .tiles:not(.backs) { --u: 12px; }
+  .seat.left, .seat.right { max-width: 34px; justify-content: center; gap: 6px; }
+  .seat.left .name, .seat.right .name { writing-mode: vertical-rl; white-space: nowrap; line-height: 1.15; }
+  .seat.left .tiles, .seat.right .tiles { --u: 8px; gap: 2px; max-width: none; }
+  .seat.left .tiles:not(.backs), .seat.right .tiles:not(.backs) { --u: 10px; }
+  .seat.left .chips, .seat.right .chips { flex-direction: column; max-width: none; }
+  .seat.left .chip, .seat.right .chip { writing-mode: vertical-rl; padding: 5px 1px; }
+  .seat .chip { font-size: .9em; }
   #boardWrap { min-height: 160px; }
 }
 
@@ -407,3 +410,8 @@ table.pts td .demo { margin: 0; padding: 4px; }
 #board .bt.choose { cursor: pointer; z-index: 3; }
 #board .bt.choose .tile { animation: glow 1s ease-in-out infinite alternate; }
 #board.hover { outline-color: #76ff03; }
+
+/* Contagem regressiva e botões entre as jogadas */
+#narrStatus .count { display: inline-block; min-width: 1.4em; font-weight: 800; color: #ffd54f; font-size: 1.15em; }
+#narrStatus button { margin: 4px 3px 0; padding: 6px 12px; }
+#btnUndo { background: #5d4037; }

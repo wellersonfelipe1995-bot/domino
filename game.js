@@ -132,6 +132,7 @@ function newHand() {
   G.knownByMe = new Set();
   G.knownAboutMe = new Set();
   G.feed = [];
+  G.undo = null;
   G.lastPlayer = null;
   G.mustSix = G.handNo === 1 || G.nextStarter == null;
   const start = G.mustSix ? G.hands.findIndex((h) => h.some((t) => t.a === 6 && t.b === 6)) : G.nextStarter;
@@ -323,7 +324,7 @@ function evaluate(p) {
 }
 
 /* ---------------- Fluxo da partida ---------------- */
-function botDelay() { return S.pace === 'passo' ? 900 : +S.pace || 1300; }
+function botDelay() { return S.pace === 'passo' ? 700 : +S.pace || 1300; }
 
 function nextTurn() {
   if (G.over) return;
@@ -346,14 +347,72 @@ function nextTurn() {
 function advance() {
   const prev = G.turn;
   G.turn = (G.turn + 1) % 4;
-  // No modo passo a passo, entre duas jogadas dos outros o jogo espera você tocar em "Continuar".
+  // No modo passo a passo, entre duas jogadas dos outros há 3 segundos para ler o que
+  // aconteceu. Dá para pausar ou seguir na hora.
   if (S.pace === 'passo' && prev !== 0 && G.turn !== 0) {
     render();
-    const g = gen;
-    narrateStatus(`Próximo: <b>${SEAT[G.turn]}</b>. <button id="btnCont" class="big primary">Continuar ▶</button>`);
-    $('#btnCont').onclick = () => { if (g === gen && !G.over) nextTurn(); };
+    countdown(3);
     return;
   }
+  nextTurn();
+}
+
+function countdown(secs) {
+  const g = gen;
+  let left = secs;
+  let paused = false;
+  const draw = () => {
+    narrateStatus(paused
+      ? `⏸ Pausado. Próximo: <b>${SEAT[G.turn]}</b>. <button id="btnGo" class="primary">▶ Continuar</button>`
+      : `Próximo: <b>${SEAT[G.turn]}</b> em <span class="count">${left}</span>s <button id="btnGo" class="primary">Agora ▶</button><button id="btnPause">⏸ Pausar</button>`);
+    $('#btnGo').onclick = () => { if (g === gen && !G.over) { clearInterval(timer); nextTurn(); } };
+    const bp = $('#btnPause');
+    if (bp) bp.onclick = () => { paused = true; draw(); };
+  };
+  const timer = setInterval(() => {
+    if (g !== gen || G.over) { clearInterval(timer); return; }
+    if (paused) return;
+    left--;
+    if (left <= 0) { clearInterval(timer); nextTurn(); return; }
+    draw();
+  }, 1000);
+  draw();
+}
+
+/* ---------------- Voltar a sua jogada ----------------
+   Antes de cada jogada sua guardamos uma foto da mão. "Voltar minha jogada" desfaz a
+   sua jogada e tudo o que os outros jogaram depois dela. */
+function takeSnapshot() {
+  G.undo = {
+    hands: G.hands.map((h) => h.map((t) => ({ ...t }))),
+    board: G.board.map((e) => ({ ...e })),
+    origin: G.origin,
+    lacks: G.lacks.map((x) => new Set(x)),
+    knownByMe: new Set(G.knownByMe),
+    knownAboutMe: new Set(G.knownAboutMe),
+    feed: G.feed.slice(),
+    mustSix: G.mustSix,
+    lastIdx: G.board.indexOf(G.lastEntry),
+    narr: $('#narrAction').innerHTML,
+  };
+}
+
+function undoMove() {
+  const u = G.undo;
+  if (!u || G.over) return;
+  G.undo = null;
+  gen++; // cancela as jogadas dos outros que estavam para acontecer
+  Object.assign(G, {
+    hands: u.hands, board: u.board, origin: u.origin, lacks: u.lacks,
+    knownByMe: u.knownByMe, knownAboutMe: u.knownAboutMe, feed: u.feed, mustSix: u.mustSix,
+  });
+  G.lastEntry = u.lastIdx >= 0 ? G.board[u.lastIdx] : null;
+  G.animEntry = null;
+  G.selected = null;
+  G.suggest = null;
+  G.turn = 0;
+  narrate(u.narr);
+  say('↩️ Você voltou a sua jogada. Pense com calma e jogue de novo!', 'tip');
   nextTurn();
 }
 
@@ -493,6 +552,7 @@ function onHandClick(id) {
 }
 
 function humanPlay(m) {
+  takeSnapshot();
   const ev = evaluate(0);
   const best = ev[0];
   const mine = ev.find((x) => x.m.t === m.t && x.m.side === m.side);
@@ -665,6 +725,7 @@ function render() {
     });
   } else sc.innerHTML = '';
 
+  $('#btnUndo').classList.toggle('hidden', !G.undo || G.over);
   if (G.turn !== 0 || G.over) {
     $('#btnPass').classList.add('hidden');
     $('#btnHint').classList.add('hidden');
@@ -1228,7 +1289,8 @@ function initUI() {
     $('#cNo').onclick = () => { hideModal(); if (G.over) endHand(G.lastResult); };
   };
   $('#btnHint').onclick = showHint;
-  $('#btnPass').onclick = () => { if (G.turn === 0 && !G.over && !legal(0).length) { setProfNow(''); doPass(0); } };
+  $('#btnPass').onclick = () => { if (G.turn === 0 && !G.over && !legal(0).length) { setProfNow(''); takeSnapshot(); doPass(0); } };
+  $('#btnUndo').onclick = undoMove;
 
   showModal(`<h2>Bem-vindo à Escola de Dominó!</h2>
     <p>Aqui você aprende o <b>dominó brasileiro em duplas</b>, do zero: as regras, como contar as pedras e como os bons jogadores "descobrem" as pedras dos outros.</p>
