@@ -627,8 +627,10 @@ function humanPlay(m) {
   takeSnapshot();
   const ev = evaluate(0);
   const best = ev[0];
-  const mine = ev.find((x) => x.m.t === m.t && x.m.side === m.side);
-  const sameAsBest = best.m.t === m.t && (best.m.side === m.side || resultEnds(best.m).join() === resultEnds(m).join());
+  // mesma pedra deixando as mesmas pontas = mesma jogada (vale também quando as duas pontas têm o mesmo número)
+  const sameMove = (x) => x.t === m.t && resultEnds(x).sort().join() === resultEnds(m).sort().join();
+  const mine = ev.find((x) => sameMove(x.m)) || best;
+  const sameAsBest = sameMove(best.m);
   say(`Você jogou ${T(m.t.a, m.t.b, true)}${G.board.length ? ' na ' + sideName(m.side) : ''}.`, '', true);
   if (S.professor && ev.length > 1) {
     if (sameAsBest) say('👍 Ótima jogada! Era exatamente o que o professor faria.', 'good');
@@ -853,7 +855,10 @@ function startDrag() {
   const [L, R] = ends() || [];
   drag.ends = [...document.querySelectorAll('#board .endtile')].map((el) => {
     const sides = el.dataset.end.split(' ');
-    const m = drag.opts.find((o) => sides.includes(o.side)) || (L === R ? drag.opts[0] : null);
+    let m = drag.opts.find((o) => sides.includes(o.side)) || null;
+    // Pontas com o mesmo número: para as regras é a mesma jogada, mas a pedra
+    // tem que ficar na ponta onde a pessoa soltou.
+    if (!m && L === R && drag.opts.length) m = { ...drag.opts[0], side: sides[0] };
     if (m) el.classList.add('drop');
     return { el, m };
   }).filter((x) => x.m);
