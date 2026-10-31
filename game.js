@@ -488,7 +488,7 @@ function onHandClick(id) {
   setProfNow(`Essa pedra serve nas <b>duas pontas</b>! Escolha onde jogar:<br>` +
     `• na <b>${sideName('L')}</b>, as pontas ficam <b>${resultEnds(opts[0]).join(' e ')}</b><br>` +
     `• na <b>${sideName('R')}</b>, as pontas ficam <b>${resultEnds(opts[1]).join(' e ')}</b><br>` +
-    'Toque no número da ponta na mesa ou nos botões abaixo dela.' +
+    'Toque na pedra da ponta, na mesa, ou nos botões abaixo dela.' +
     (S.professor ? '<br>Pense: qual número o próximo adversário não tem? Qual número você ainda tem na mão?' : ''));
 }
 
@@ -697,8 +697,7 @@ function setupDrag(el) {
     drag.ghost.style.left = ev.clientX + 'px';
     drag.ghost.style.top = ev.clientY + 'px';
     drag.target = findDropTarget(ev.clientX, ev.clientY);
-    document.querySelectorAll('#board .endbadge').forEach((b) => b.classList.toggle('hover', !!drag.target && b === drag.target.badge));
-    $('#board').classList.toggle('hover', !!drag.target && !drag.target.badge);
+    showDropFeedback();
   });
   el.addEventListener('pointerup', () => { if (drag && drag.el === el) finishDrag(true); });
   el.addEventListener('pointercancel', () => { if (drag && drag.el === el) finishDrag(false); });
@@ -717,41 +716,46 @@ function startDrag() {
   document.body.appendChild(ghost);
   drag.ghost = ghost;
   drag.el.classList.add('dragging');
+  // pontas onde a pedra encaixa (se as duas pontas têm o mesmo número, as duas servem)
   const [L, R] = ends() || [];
-  document.querySelectorAll('#board .endbadge').forEach((b) => {
-    const side = b.dataset.side;
-    const ok = drag.opts.some((m) => m.side === side) || (L === R && drag.opts.length > 0);
-    b.classList.add(ok ? 'drop' : 'nodrop');
-  });
+  drag.ends = [...document.querySelectorAll('#board .endtile')].map((el) => {
+    const sides = el.dataset.end.split(' ');
+    const m = drag.opts.find((o) => sides.includes(o.side)) || (L === R ? drag.opts[0] : null);
+    if (m) el.classList.add('drop');
+    return { el, m };
+  }).filter((x) => x.m);
   if (!G.board.length && drag.opts.length) $('#board').classList.add('droparea');
 }
 
+// Escolhe a ponta para onde a pedra está indo: a ponta válida mais perto do dedo.
+// Soltando em qualquer lugar em cima da mesa, vale a ponta mais perto.
 function findDropTarget(x, y) {
   if (!drag.opts.length) return null;
-  const board = $('#board');
-  if (!G.board.length) {
-    const r = board.getBoundingClientRect();
-    return x >= r.left && x <= r.right && y >= r.top - 20 && y <= r.bottom + 20 ? { m: drag.opts[0] } : null;
-  }
-  // a ponta válida mais perto do dedo (até ~80px de distância)
+  const r = $('#boardWrap').getBoundingClientRect();
+  const overTable = x >= r.left - 30 && x <= r.right + 30 && y >= r.top - 30 && y <= r.bottom + 10;
+  if (!G.board.length) return overTable ? { m: drag.opts[0] } : null;
   let best = null;
-  document.querySelectorAll('#board .endbadge.drop').forEach((b) => {
-    const r = b.getBoundingClientRect();
-    const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
-    if (d < 80 && (!best || d < best.d)) best = { d, badge: b };
-  });
-  if (best) {
-    const m = drag.opts.find((o) => o.side === best.badge.dataset.side) || drag.opts[0];
-    return { m, badge: best.badge };
+  for (const e of drag.ends) {
+    const b = e.el.getBoundingClientRect();
+    const d = Math.hypot(x - (b.left + b.width / 2), y - (b.top + b.height / 2));
+    if (!best || d < best.d) best = { ...e, d };
   }
-  // só uma ponta possível e o dedo em cima da mesa: joga nela
-  const sides = new Set(drag.opts.map((o) => resultEnds(o).join()));
-  const r = board.getBoundingClientRect();
-  if (sides.size === 1 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-    const badge = [...document.querySelectorAll('#board .endbadge.drop')].find((b) => b.dataset.side === drag.opts[0].side);
-    return { m: drag.opts[0], badge };
+  if (!best) return null;
+  return overTable || best.d < 110 ? best : { ...best, near: true };
+}
+
+// A pedra da ponta cresce conforme a sua pedra chega perto dela.
+function showDropFeedback() {
+  const t = drag.target;
+  for (const e of drag.ends || []) {
+    let scale = 1;
+    if (t && e.el === t.el) {
+      scale = t.near ? 1 + 0.35 * Math.max(0, 1 - t.d / 300) : 1.6;
+    }
+    e.el.style.transform = scale > 1 ? `scale(${scale.toFixed(2)})` : '';
+    e.el.classList.toggle('target', !!t && e.el === t.el && !t.near);
   }
-  return null;
+  $('#board').classList.toggle('hover', !!t && !G.board.length);
 }
 
 function finishDrag(dropped) {
@@ -763,11 +767,11 @@ function finishDrag(dropped) {
   d.ghost.remove();
   d.el.classList.remove('dragging');
   $('#board').classList.remove('droparea', 'hover');
-  document.querySelectorAll('#board .endbadge').forEach((b) => b.classList.remove('drop', 'nodrop', 'hover'));
+  document.querySelectorAll('#board .endtile').forEach((el) => { el.classList.remove('drop', 'target'); el.style.transform = ''; });
   if (!dropped || G.over || G.turn !== 0) return;
-  if (d.target) { humanPlay(d.target.m); return; }
+  if (d.target && !d.target.near) { humanPlay(d.target.m); return; }
   if (!d.opts.length) { onHandClick(d.id); return; }
-  setProfNow('Quase! Solte a pedra <b>em cima do número da ponta</b> (a bolinha amarela) onde você quer jogar.');
+  setProfNow('Quase! Leve a pedra <b>até a mesa</b>, perto da ponta onde você quer jogar — a pedra da ponta cresce quando você está chegando.');
 }
 
 /* ---------------- Desenho da mesa ----------------
@@ -822,8 +826,8 @@ function layoutBoard(X) {
   const leftItems = left.out.map((it) => ({ ...it, x: -(it.x + it.w), y: -(it.y + it.h), d: FLIP[it.d] }));
   return {
     items: [...leftItems, center, ...right.out],
-    endL: { x: -left.end.x, y: -left.end.y, d: FLIP[left.end.d] },
-    endR: right.end,
+    endItemL: leftItems.length ? leftItems[leftItems.length - 1] : center,
+    endItemR: right.out.length ? right.out[right.out.length - 1] : center,
   };
 }
 
@@ -845,17 +849,12 @@ function renderBoard() {
   }
   const W = board.clientWidth || 320;
   const u = Math.max(14, Math.min(32, Math.floor(W / 16)));
-  const X = Math.max(3, Math.floor(W / 2 / u - 1.6)); // deixa espaço para o número da ponta
+  const X = Math.max(3, Math.floor(W / 2 / u - 1.1)); // folga para carrão que passa da borda
   const lay = layoutBoard(X);
-  const [L, R] = ends();
   const selOpts = G.selected ? legal(0).filter((m) => m.t === G.selected) : [];
-  const badges = [
-    { side: 'L', num: L, ...lay.endL },
-    { side: 'R', num: R, ...lay.endR },
-  ].map((b) => ({ ...b, bx: b.x + (b.d === 'E' ? 0.9 : -0.9), by: b.y }));
-  let minY = Math.min(...lay.items.map((i) => i.y), ...badges.map((b) => b.by - 0.8));
-  let maxY = Math.max(...lay.items.map((i) => i.y + i.h), ...badges.map((b) => b.by + 0.8));
-  const pad = u * 0.6;
+  const minY = Math.min(...lay.items.map((i) => i.y));
+  const maxY = Math.max(...lay.items.map((i) => i.y + i.h));
+  const pad = u * 0.8; // espaço para a pedra da ponta crescer
   const px = (x) => W / 2 + x * u;
   const py = (y) => (y - minY) * u + pad;
   let html = '';
@@ -863,18 +862,20 @@ function renderBoard() {
     let cls = `p${it.e.p} ${teamOf(it.e.p) === 0 ? 'us' : 'them'}`;
     if (it.e === G.lastEntry) cls += ' last';
     if (it.e === G.animEntry) cls += ' enter';
-    html += `<div class="bt" style="left:${px(it.x)}px;top:${py(it.y)}px">${boardTileHTML(it, cls)}</div>`;
+    const sides = [it === lay.endItemL ? 'L' : '', it === lay.endItemR ? 'R' : ''].filter(Boolean);
+    const choose = sides.some((sd) => selOpts.some((m) => m.side === sd));
+    const endAttr = sides.length ? ` data-end="${sides.join(' ')}"` : '';
+    html += `<div class="bt${sides.length ? ' endtile' : ''}${choose ? ' choose' : ''}"${endAttr} style="left:${px(it.x)}px;top:${py(it.y)}px">${boardTileHTML(it, cls)}</div>`;
   }
   G.animEntry = null;
-  for (const b of badges) {
-    const can = selOpts.some((m) => m.side === b.side);
-    html += `<div class="endbadge ${can ? 'choose' : ''}" data-side="${b.side}" style="left:${px(b.bx)}px;top:${py(b.by)}px" title="Ponta do ${b.num}">${b.num}</div>`;
-  }
   board.style.setProperty('--u', u + 'px');
   board.style.height = (maxY - minY) * u + 2 * pad + 'px';
   board.innerHTML = html;
-  board.querySelectorAll('.endbadge.choose').forEach((el) => {
-    el.onclick = () => humanPlay(selOpts.find((m) => m.side === el.dataset.side));
+  board.querySelectorAll('.bt.choose').forEach((el) => {
+    el.onclick = () => {
+      const m = selOpts.find((o) => el.dataset.end.split(' ').includes(o.side));
+      if (m) humanPlay(m);
+    };
   });
 }
 
@@ -1108,7 +1109,7 @@ const LESSONS = [
         <li><b>🧮 Contador</b> — quantas pedras de cada número ainda estão com os outros.</li>
         <li><b>🕵️ Leitura dos jogadores</b> — o que cada um não tem (pelos passes) e as pedras que dá para deduzir.</li>
         <li><b>⚠️ O que os adversários sabem de você</b> — veja o que você está entregando!</li>
-        <li><b>Para jogar</b>, arraste a sua pedra até o número da ponta (a bolinha amarela) ou simplesmente toque nela.</li>
+        <li><b>Para jogar</b>, arraste a sua pedra até a ponta onde quer jogar (a pedra da ponta cresce quando você chega perto) ou simplesmente toque nela.</li>
         <li><b>⚙️ Opções</b> — ligue o <b>modo espiar</b> para ver as pedras de todos e entender as jogadas dos robôs. Quando estiver confiante, <b>desligue o professor</b>.</li>
       </ul>
       <p>Na mesa, cada pedra ganha um tom bem clarinho de quem jogou:</p>

@@ -167,23 +167,6 @@ main { padding: 10px; }
   60% { transform: scale(.95); opacity: 1; }
   100% { transform: scale(1); }
 }
-.endbadge {
-  position: absolute;
-  width: calc(var(--u) * 1.4);
-  height: calc(var(--u) * 1.4);
-  margin: calc(var(--u) * -0.7) 0 0 calc(var(--u) * -0.7);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, .55);
-  color: #ffd54f;
-  font-weight: 800;
-  font-size: calc(var(--u) * .8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #ffd54f;
-  z-index: 2;
-}
-.endbadge.choose { background: #00acc1; color: #fff; border-color: #fff; cursor: pointer; animation: glow 1s ease-in-out infinite alternate; }
 .empty-board { opacity: .8; text-align: center; font-size: 1.05em; padding: 20px; }
 #narr {
   background: rgba(0, 0, 0, .35);
@@ -412,9 +395,15 @@ table.pts td .demo { margin: 0; padding: 4px; }
   transform: translate(-50%, -60%) scale(1.1) rotate(-6deg);
   box-shadow: 0 12px 24px rgba(0,0,0,.55);
 }
-.endbadge { transition: transform .15s, opacity .15s, background .15s; }
-.endbadge.drop { background: #00acc1; color: #fff; border-color: #fff; transform: scale(1.3); animation: glow 1s ease-in-out infinite alternate; }
-.endbadge.hover { background: #43a047; transform: scale(1.75); }
-.endbadge.nodrop { opacity: .3; }
 #board.droparea { outline: 3px dashed #ffd54f; outline-offset: 4px; border-radius: 12px; }
 #board.droparea.hover { outline-color: #76ff03; }
+
+/* Pedra da ponta: acende quando a pedra arrastada encaixa nela e cresce quando chega perto */
+#board .bt { transition: transform .12s ease-out; transform-origin: center; }
+#board .bt.drop { z-index: 3; }
+#board .bt.drop .tile { box-shadow: 0 0 0 3px #00e5ff, 0 0 12px #00e5ff; }
+#board .bt.target { z-index: 4; }
+#board .bt.target .tile { box-shadow: 0 0 0 3px #76ff03, 0 0 18px #76ff03; }
+#board .bt.choose { cursor: pointer; z-index: 3; }
+#board .bt.choose .tile { animation: glow 1s ease-in-out infinite alternate; }
+#board.hover { outline-color: #76ff03; }
