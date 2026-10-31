@@ -1001,7 +1001,8 @@ const LESSONS = [
       <p>Na roda de dominó, os números têm apelidos:</p>
       <div class="demo felt">${[0, 1, 2, 3, 4, 5, 6].map((n) => `<div class="col">${T(n, n)}<span class="lbl">${n}<br><b>${NUM[n]}</b></span></div>`).join('')}</div>
       <p>As pedras acima, com os dois lados iguais, se chamam <b>${w.p}</b>. São 7 ${w.p}.</p>
-      <div class="box">Cada região chama de um jeito: <b>carrão</b>, <b>carroça</b>, <b>bucha</b>… É tudo a mesma coisa! Você pode escolher o nome que o jogo usa em <b>⚙️ Opções</b>.</div>
+      <div class="box">Cada região chama de um jeito: <b>carrão</b>, <b>carroça</b>, <b>bucha</b>… É tudo a mesma coisa! Escolha como o jogo vai chamar (dá para mudar depois em <b>⚙️ Opções</b>):
+        <div class="namePicker lessonPicker"></div></div>
       <div class="box gold"><b>Segredo nº 1:</b> cada número aparece em <b>exatamente 7 pedras</b>. Veja o 5 (quina):</div>
       <div class="demo felt">${[0, 1, 2, 3, 4, 5, 6].map((n) => T(Math.min(n, 5), Math.max(n, 5))).join('')}</div>
       <p>Guarde isso! É a base da <b>contagem</b>, a técnica que os bons jogadores usam para "adivinhar" as pedras dos outros.</p>`,
@@ -1215,6 +1216,8 @@ function renderLesson() {
       <button id="lSkip">🎮 Ir para o jogo</button>
       <button id="lNext" class="primary big">${last ? '🎮 Começar a jogar' : 'Próxima ▶'}</button>
     </div></div>`;
+  const np = $('#lessons .namePicker');
+  if (np) renderNamePicker(np);
   $('#lessons').querySelectorAll('.progress span').forEach((s) => { s.onclick = () => { lessonIdx = +s.dataset.i; renderLesson(); }; });
   $('#lessons').querySelectorAll('.quiz button').forEach((b) => {
     b.onclick = () => {
@@ -1295,13 +1298,10 @@ function initUI() {
   showModal(`<h2>Bem-vindo à Escola de Dominó!</h2>
     <p>Aqui você aprende o <b>dominó brasileiro em duplas</b>, do zero: as regras, como contar as pedras e como os bons jogadores "descobrem" as pedras dos outros.</p>
     <p>Durante o jogo, um <b>professor</b> explica cada jogada e dá dicas.</p>
-    <div class="namePicker" id="welcomePicker"></div>
-    <p style="font-size:.85em;opacity:.8">Dá para mudar isso depois em ⚙️ Opções.</p>
     <div class="btns">
       <button class="big primary" id="wLearn">📚 Aprender passo a passo</button>
       <button class="big" id="wPlay">🎮 Já sei o básico, quero jogar</button>
     </div>`);
-  renderNamePicker($('#welcomePicker'));
   $('#wLearn').onclick = () => { hideModal(); openLessons(0); };
   $('#wPlay').onclick = () => { hideModal(); startPlaying(); };
 }
