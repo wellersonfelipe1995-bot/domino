@@ -401,3 +401,20 @@ table.pts td .demo { margin: 0; padding: 4px; }
 }
 .endmark b { font-size: 1.3em; color: #ffd54f; }
 .boardlegend .tile { --u: inherit; }
+
+/* ---------- Arrastar a pedra ---------- */
+.seat.bottom .tile { touch-action: none; user-select: none; -webkit-user-select: none; }
+.seat.bottom .tile.dragging { opacity: .3; }
+.tile.ghost {
+  position: fixed;
+  z-index: 50;
+  pointer-events: none;
+  transform: translate(-50%, -60%) scale(1.1) rotate(-6deg);
+  box-shadow: 0 12px 24px rgba(0,0,0,.55);
+}
+.endbadge { transition: transform .15s, opacity .15s, background .15s; }
+.endbadge.drop { background: #00acc1; color: #fff; border-color: #fff; transform: scale(1.3); animation: glow 1s ease-in-out infinite alternate; }
+.endbadge.hover { background: #43a047; transform: scale(1.75); }
+.endbadge.nodrop { opacity: .3; }
+#board.droparea { outline: 3px dashed #ffd54f; outline-offset: 4px; border-radius: 12px; }
+#board.droparea.hover { outline-color: #76ff03; }

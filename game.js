@@ -460,7 +460,7 @@ function humanTurn(moves) {
   } else if (moves.length) {
     const n = new Set(moves.map((m) => m.t)).size;
     msg = `<b>Sua vez!</b> As pontas são <b>${nn(e[0])}</b> e <b>${nn(e[1])}</b>. ` +
-      (S.professor ? `Você tem ${n} pedra(s) que encaixam (destacadas em amarelo). Toque em uma para jogar.` : 'Toque numa pedra para jogar.');
+      (S.professor ? `Você tem ${n} pedra(s) que encaixam (destacadas em amarelo). <b>Arraste</b> a pedra até a ponta onde quer jogar, ou toque nela.` : 'Arraste uma pedra até a ponta, ou toque nela.');
   } else {
     msg = `Você não tem nenhuma pedra com ${listNums([...new Set(e)])}. Você precisa <b>PASSAR</b>.` +
       `<br>⚠️ Depois disso, todo mundo vai saber que você não tem ${listNums([...new Set(e)])}. Por isso é bom manter variedade de números na mão.`;
@@ -646,7 +646,10 @@ function render() {
     el.innerHTML = `<div class="name ${nameCls}">${label} · ${G.hands[p].length} ${G.hands[p].length === 1 ? "pedra" : "pedras"}</div><div class="tiles ${hidden ? 'backs' : ''}">${tiles}</div>${chips}`;
     bubbles.forEach((b) => el.appendChild(b));
   }
-  document.querySelectorAll('#seat0 .tile').forEach((el) => { el.onclick = () => onHandClick(el.dataset.id); });
+  document.querySelectorAll('#seat0 .tile').forEach((el) => {
+    el.onclick = () => { if (!dragJustEnded) onHandClick(el.dataset.id); };
+    setupDrag(el);
+  });
 
   renderBoard();
   const sc = $('#sideChoice');
@@ -669,6 +672,102 @@ function render() {
   renderCounter();
   renderReading();
   renderFeed();
+}
+
+/* ---------------- Arrastar a pedra até a ponta ----------------
+   Segurar e arrastar uma pedra da mão: as pontas onde ela encaixa acendem e,
+   ao soltar perto de uma delas, a pedra é jogada ali. Um toque simples continua
+   funcionando como antes. */
+let drag = null;
+let dragJustEnded = false;
+
+function setupDrag(el) {
+  el.addEventListener('pointerdown', (ev) => {
+    if (G.over || G.turn !== 0 || ev.button > 0) return;
+    drag = { el, id: el.dataset.id, sx: ev.clientX, sy: ev.clientY, started: false };
+    try { el.setPointerCapture(ev.pointerId); } catch (e) { /* ok */ }
+  });
+  el.addEventListener('pointermove', (ev) => {
+    if (!drag || drag.el !== el) return;
+    if (!drag.started) {
+      if (Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) < 8) return;
+      startDrag();
+    }
+    ev.preventDefault();
+    drag.ghost.style.left = ev.clientX + 'px';
+    drag.ghost.style.top = ev.clientY + 'px';
+    drag.target = findDropTarget(ev.clientX, ev.clientY);
+    document.querySelectorAll('#board .endbadge').forEach((b) => b.classList.toggle('hover', !!drag.target && b === drag.target.badge));
+    $('#board').classList.toggle('hover', !!drag.target && !drag.target.badge);
+  });
+  el.addEventListener('pointerup', () => { if (drag && drag.el === el) finishDrag(true); });
+  el.addEventListener('pointercancel', () => { if (drag && drag.el === el) finishDrag(false); });
+}
+
+function startDrag() {
+  const t = G.hands[0].find((x) => tid(x) === drag.id);
+  drag.started = true;
+  drag.t = t;
+  drag.opts = legal(0).filter((m) => m.t === t);
+  G.selected = null;
+  $('#sideChoice').innerHTML = '';
+  const ghost = drag.el.cloneNode(true);
+  ghost.className = 'tile v ghost';
+  ghost.style.setProperty('--u', getComputedStyle(drag.el).getPropertyValue('--u'));
+  document.body.appendChild(ghost);
+  drag.ghost = ghost;
+  drag.el.classList.add('dragging');
+  const [L, R] = ends() || [];
+  document.querySelectorAll('#board .endbadge').forEach((b) => {
+    const side = b.dataset.side;
+    const ok = drag.opts.some((m) => m.side === side) || (L === R && drag.opts.length > 0);
+    b.classList.add(ok ? 'drop' : 'nodrop');
+  });
+  if (!G.board.length && drag.opts.length) $('#board').classList.add('droparea');
+}
+
+function findDropTarget(x, y) {
+  if (!drag.opts.length) return null;
+  const board = $('#board');
+  if (!G.board.length) {
+    const r = board.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top - 20 && y <= r.bottom + 20 ? { m: drag.opts[0] } : null;
+  }
+  // a ponta válida mais perto do dedo (até ~80px de distância)
+  let best = null;
+  document.querySelectorAll('#board .endbadge.drop').forEach((b) => {
+    const r = b.getBoundingClientRect();
+    const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+    if (d < 80 && (!best || d < best.d)) best = { d, badge: b };
+  });
+  if (best) {
+    const m = drag.opts.find((o) => o.side === best.badge.dataset.side) || drag.opts[0];
+    return { m, badge: best.badge };
+  }
+  // só uma ponta possível e o dedo em cima da mesa: joga nela
+  const sides = new Set(drag.opts.map((o) => resultEnds(o).join()));
+  const r = board.getBoundingClientRect();
+  if (sides.size === 1 && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+    const badge = [...document.querySelectorAll('#board .endbadge.drop')].find((b) => b.dataset.side === drag.opts[0].side);
+    return { m: drag.opts[0], badge };
+  }
+  return null;
+}
+
+function finishDrag(dropped) {
+  const d = drag;
+  drag = null;
+  if (!d.started) return;
+  dragJustEnded = true;
+  setTimeout(() => { dragJustEnded = false; }, 50);
+  d.ghost.remove();
+  d.el.classList.remove('dragging');
+  $('#board').classList.remove('droparea', 'hover');
+  document.querySelectorAll('#board .endbadge').forEach((b) => b.classList.remove('drop', 'nodrop', 'hover'));
+  if (!dropped || G.over || G.turn !== 0) return;
+  if (d.target) { humanPlay(d.target.m); return; }
+  if (!d.opts.length) { onHandClick(d.id); return; }
+  setProfNow('Quase! Solte a pedra <b>em cima do número da ponta</b> (a bolinha amarela) onde você quer jogar.');
 }
 
 /* ---------------- Desenho da mesa ----------------
@@ -1009,6 +1108,7 @@ const LESSONS = [
         <li><b>🧮 Contador</b> — quantas pedras de cada número ainda estão com os outros.</li>
         <li><b>🕵️ Leitura dos jogadores</b> — o que cada um não tem (pelos passes) e as pedras que dá para deduzir.</li>
         <li><b>⚠️ O que os adversários sabem de você</b> — veja o que você está entregando!</li>
+        <li><b>Para jogar</b>, arraste a sua pedra até o número da ponta (a bolinha amarela) ou simplesmente toque nela.</li>
         <li><b>⚙️ Opções</b> — ligue o <b>modo espiar</b> para ver as pedras de todos e entender as jogadas dos robôs. Quando estiver confiante, <b>desligue o professor</b>.</li>
       </ul>
       <p>Na mesa, cada pedra ganha um tom bem clarinho de quem jogou:</p>
