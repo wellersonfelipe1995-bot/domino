@@ -70,7 +70,7 @@ function loadSettings() {
   try { return JSON.parse(localStorage.getItem('domino-settings') || '{}'); } catch (e) { return {}; }
 }
 const S = Object.assign(
-  { professor: true, spy: false, colors: true, pace: 'passo', lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
+  { professor: true, spy: false, colors: true, pace: 'passo', sound: true, lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
   loadSettings()
 );
 function saveSettings() {
@@ -106,6 +106,76 @@ function W() {
     o: f ? 'a' : 'o', um: f ? 'uma' : 'um', do: f ? 'da' : 'do', dos: f ? 'das' : 'dos',
     ele: f ? 'ela' : 'ele', preso: f ? 'presa' : 'preso',
   };
+}
+
+/* ---------------- Sons (gerados na hora, sem arquivos) ----------------
+   "Tec" de uma pedra batendo na outra quando alguém joga, e as batidinhas na mesa
+   quando alguém passa, como na roda de verdade. */
+let audioCtx = null;
+function audio() {
+  if (!S.sound) return null;
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+// O navegador só libera o som depois de um toque na tela.
+document.addEventListener('pointerdown', () => { audio(); }, { capture: true });
+
+function noiseBurst(ctx, at, dur, freq, q, gain) {
+  const n = Math.max(1, Math.floor(ctx.sampleRate * dur));
+  const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 5);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = freq;
+  f.Q.value = q;
+  const g = ctx.createGain();
+  g.gain.value = gain;
+  src.connect(f).connect(g).connect(ctx.destination);
+  src.start(at);
+}
+
+function tone(ctx, at, f0, f1, dur, gain) {
+  const o = ctx.createOscillator();
+  o.frequency.setValueAtTime(f0, at);
+  o.frequency.exponentialRampToValueAtTime(f1, at + dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(gain, at);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g).connect(ctx.destination);
+  o.start(at);
+  o.stop(at + dur + 0.02);
+}
+
+// pedra encostando na outra: um estalo seco + um repique curtinho
+function soundClack(strong = 1) {
+  const ctx = audio();
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime + 0.01;
+    const v = 0.9 * strong;
+    noiseBurst(ctx, t, 0.035, 2600, 3, v);
+    tone(ctx, t, 1500, 900, 0.05, 0.22 * strong);
+    noiseBurst(ctx, t + 0.045, 0.025, 3400, 4, v * 0.35);
+  } catch (e) { /* sem som, tudo bem */ }
+}
+
+// passar a vez: duas batidinhas com a pedra na mesa
+function soundKnock() {
+  const ctx = audio();
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime + 0.01;
+    for (const dt of [0, 0.16]) {
+      tone(ctx, t + dt, 220, 90, 0.12, 0.5);
+      noiseBurst(ctx, t + dt, 0.04, 900, 1.5, 0.5);
+    }
+  } catch (e) { /* sem som, tudo bem */ }
 }
 
 /* ---------------- Estado do jogo ---------------- */
@@ -431,6 +501,7 @@ function doPlay(p, m) {
   else if (m.side === 'L') { G.board.unshift((entry = { a: otherSide(t, prev[0]), b: prev[0], p })); G.origin++; }
   else G.board.push((entry = { a: prev[1], b: otherSide(t, prev[1]), p }));
   G.lastEntry = entry;
+  soundClack(p === 0 ? 1 : 0.8);
   G.animEntry = entry;
   const now = ends();
   const who = p === 0 ? '<b>Você</b> jogou' : `<b>${SEAT[p]}</b> jogou`;
@@ -465,6 +536,7 @@ function doPass(p) {
   const fresh = nums.filter((n) => !G.lacks[p].has(n));
   nums.forEach((n) => G.lacks[p].add(n));
   bubble(p, 'PASSOU!');
+  soundKnock();
   narrate(`✋ <b>${p === 0 ? 'Você passou' : SEAT[p] + ' passou'}</b> — ${p === 0 ? 'você' : 'ele'} não tem nenhuma pedra com ${listNums(nums)}.`);
   if (p === 0) {
     say(`Você passou. ⚠️ Agora todos sabem que você não tem ${listNums(nums)}.`, 'alert');
@@ -1274,6 +1346,8 @@ function initUI() {
   $('#optProfessor').checked = S.professor;
   $('#optSpy').checked = S.spy;
   $('#optColors').checked = S.colors;
+  $('#optSound').checked = S.sound;
+  $('#optSound').onchange = (e) => { S.sound = e.target.checked; saveSettings(); if (S.sound) soundClack(); };
   $('#optSpeed').value = String(S.pace);
   $('#optProfessor').onchange = (e) => { S.professor = e.target.checked; saveSettings(); render(); };
   $('#optSpy').onchange = (e) => { S.spy = e.target.checked; saveSettings(); render(); };

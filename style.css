@@ -156,8 +156,8 @@ main { padding: 10px; }
    (azulado = sua dupla, rosado = adversários), sem atrapalhar as cores das bolinhas. */
 .tile.us { background: linear-gradient(160deg, #f1f7ff, #d9e8fb); border-color: #7f9cc4; }
 .tile.them { background: linear-gradient(160deg, #fff3f1, #f8dcd8); border-color: #c49690; }
-#board .half { padding: calc(var(--u) * .07); }
-#board .half i.pip { width: 84%; height: 84%; }
+#board .half { padding: calc(var(--u) * .09); }
+#board .half i.pip { width: calc(var(--u) * .22); height: calc(var(--u) * .22); }
 .boardlegend { font-size: .82em; text-align: center; opacity: .9; display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap; --u: 10px; }
 .boardlegend span { display: inline-flex; align-items: center; gap: 4px; }
 #board .tile.last { box-shadow: 0 0 0 3px #ffd54f, 0 0 14px #ffd54f; }
@@ -199,17 +199,21 @@ main { padding: 10px; }
 .tile.h { flex-direction: row; width: calc(var(--u) * 2); height: var(--u); }
 .tile.v .half:first-child { border-bottom: 1px solid #9b917a; }
 .tile.h .half:first-child { border-right: 1px solid #9b917a; }
+/* Cada metade ocupa exatamente o espaço de dentro da pedra (descontando a moldura),
+   para as bolinhas ficarem centralizadas e não encostarem na borda. */
 .half {
-  width: var(--u);
-  height: var(--u);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  padding: calc(var(--u) * .1);
-  flex: none;
+  padding: calc(var(--u) * .12);
 }
-.half i { display: block; }
-.half i.pip { width: 72%; height: 72%; border-radius: 50%; place-self: center; background: currentColor; box-shadow: inset 0 -1px 1px rgba(0,0,0,.4); }
+.tile.v .half { width: 100%; }
+.tile.h .half { height: 100%; }
+.half i { display: block; min-width: 0; min-height: 0; }
+.half i.pip { width: calc(var(--u) * .19); height: calc(var(--u) * .19); border-radius: 50%; place-self: center; background: currentColor; box-shadow: inset 0 -1px 1px rgba(0,0,0,.4); }
 .n0, .n1, .n2, .n3, .n4, .n5, .n6 { color: #222; }
 body.colors .n1 { color: #d32f2f; }
 body.colors .n2 { color: #ef6c00; }
