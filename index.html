@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escola de Dominó</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Escola de Dominó</h1>
+  <div id="scorebox" title="Placar da partida (vence quem fizer 6 pontos)">
+    <span class="us">Nós <b id="scoreUs">0</b></span>
+    <span class="sep">×</span>
+    <span class="them"><b id="scoreThem">0</b> Eles</span>
+  </div>
+  <nav>
+    <button id="btnLessons">📚 Aulas</button>
+    <button id="btnNew">🔄 Nova partida</button>
+    <button id="btnSettings">⚙️ Opções</button>
+  </nav>
+</header>
+
+<div id="settings" class="hidden">
+  <label><input type="checkbox" id="optProfessor"> 🎓 Professor ligado (destaca jogadas e explica tudo)</label>
+  <label><input type="checkbox" id="optSpy"> 👀 Modo espiar (ver as pedras de todos — só para estudar)</label>
+  <label><input type="checkbox" id="optColors"> 🎨 Cores nos números</label>
+  <label>⏱️ Velocidade dos outros jogadores
+    <select id="optSpeed">
+      <option value="1700">Devagar</option>
+      <option value="1000">Normal</option>
+      <option value="450">Rápida</option>
+    </select>
+  </label>
+</div>
+
+<main>
+  <section id="lessons" class="hidden"></section>
+
+  <section id="game">
+    <div id="table">
+      <div class="seat top" id="seat2"></div>
+      <div class="seat left" id="seat3"></div>
+      <div id="boardWrap">
+        <div id="board"></div>
+        <div id="sideChoice"></div>
+      </div>
+      <div class="seat right" id="seat1"></div>
+      <div class="seat bottom" id="seat0"></div>
+      <div id="actions">
+        <button id="btnHint" class="big">💡 Dica do professor</button>
+        <button id="btnPass" class="big danger hidden">✋ Passar a vez</button>
+      </div>
+    </div>
+
+    <aside id="panel">
+      <div class="card" id="profCard">
+        <h3>🎓 Professor</h3>
+        <div id="profNow"></div>
+        <div id="feed"></div>
+      </div>
+      <div class="card">
+        <h3>🧮 Contador de pedras <small>(cada número aparece em 7 pedras)</small></h3>
+        <div id="counter"></div>
+        <div class="legend"><span class="dot board"></span> já na mesa <span class="dot mine"></span> na sua mão <span class="dot unk"></span> com os outros</div>
+      </div>
+      <div class="card">
+        <h3>🕵️ Leitura dos jogadores</h3>
+        <div id="reading"></div>
+      </div>
+      <div class="card warn">
+        <h3>⚠️ O que os adversários já sabem de você</h3>
+        <div id="aboutMe"></div>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<div id="modal" class="hidden"><div id="modalBox"></div></div>
+
+<script src="game.js"></script>
+</body>
+</html>
