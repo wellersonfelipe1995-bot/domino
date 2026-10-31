@@ -334,3 +334,13 @@ table.pts td .demo { margin: 0; padding: 4px; }
 .np-custom { display: inline-flex; gap: 4px; }
 .np-custom input, .np-custom select { font: inherit; border-radius: 6px; padding: 4px 6px; border: 0; }
 .np-hint { font-size: .85em; opacity: .8; width: 100%; }
+
+/* Marcador de ponta sempre grudado na pedra da ponta */
+.glue { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.demo .glue { gap: 6px; }
+@media (max-width: 520px) {
+  .lesson { padding: 14px 12px; }
+  .demo { --u: 18px; gap: 4px; padding: 8px; }
+  .demo .glue { gap: 4px; }
+  .demo .endmark { padding: 3px 6px; }
+}

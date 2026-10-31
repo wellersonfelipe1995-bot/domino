@@ -56,6 +56,13 @@ function tileHTML(a, b, opts = {}) {
   return `<div class="tile ${horiz ? 'h' : 'v'} ${cls}"${data} title="${a}-${b}">${halfHTML(a, horiz)}${halfHTML(b, horiz)}</div>`;
 }
 const T = (a, b, h) => tileHTML(a, b, { h });
+// Monta a fila da mesa "colando" cada marcador de ponta na pedra vizinha,
+// para que ele nunca vá parar sozinho em outra linha quando a fila quebra.
+function chainHTML(markL, tiles, markR) {
+  if (tiles.length === 1) return `<span class="glue">${markL}${tiles[0]}${markR}</span>`;
+  return `<span class="glue">${markL}${tiles[0]}</span>${tiles.slice(1, -1).join('')}<span class="glue">${tiles[tiles.length - 1]}${markR}</span>`;
+}
+const mark = (n, side) => (side === 'L' ? `<span class="endmark">◀ <b>${n}</b></span>` : `<span class="endmark"><b>${n}</b> ▶</span>`);
 const backHTML = () => '<div class="tile v back"></div>';
 
 /* ---------------- Configurações ---------------- */
@@ -626,14 +633,13 @@ function render() {
     const selOpts = G.selected ? legal(0).filter((m) => m.t === G.selected) : [];
     const canL = selOpts.some((m) => m.side === 'L');
     const canR = selOpts.some((m) => m.side === 'R');
-    let html = `<div class="endmark ${canL ? 'choose' : ''}" data-side="L">◀ <b>${L}</b></div>`;
-    G.board.forEach((x, i) => {
+    const markL = `<div class="endmark ${canL ? 'choose' : ''}" data-side="L">◀ <b>${L}</b></div>`;
+    const markR = `<div class="endmark ${canR ? 'choose' : ''}" data-side="R"><b>${R}</b> ▶</div>`;
+    const tiles = G.board.map((x) => {
       const last = key(x.a, x.b) === G.lastTile && G.lastPlayer === x.p ? 'last' : '';
-      html += tileHTML(x.a, x.b, { h: x.a !== x.b, cls: `p${x.p} ${last}` });
-      void i;
+      return tileHTML(x.a, x.b, { h: x.a !== x.b, cls: `p${x.p} ${last}` });
     });
-    html += `<div class="endmark ${canR ? 'choose' : ''}" data-side="R"><b>${R}</b> ▶</div>`;
-    board.innerHTML = html;
+    board.innerHTML = chainHTML(markL, tiles, markR);
     board.querySelectorAll('.endmark.choose').forEach((el) => {
       el.onclick = () => humanPlay(selOpts.find((m) => m.side === el.dataset.side));
     });
@@ -766,9 +772,9 @@ const LESSONS = [
     title: 'Encaixando as pedras',
     html: (w) => `
       <p>A fila de pedras na mesa tem <b>duas pontas</b>. Na sua vez, você joga uma pedra que tenha o <b>mesmo número</b> de uma das pontas, encostando os números iguais.</p>
-      <div class="demo felt"><span class="endmark">◀ <b>3</b></span>${T(3, 6, true)}${T(6, 6)}${T(6, 1, true)}<span class="endmark"><b>1</b> ▶</span></div>
+      <div class="demo felt">${chainHTML(mark(3, 'L'), [T(3, 6, true), T(6, 6), T(6, 1, true)], mark(1, 'R'))}</div>
       <p>Aqui as pontas são <b>3</b> e <b>1</b>. Você pode jogar qualquer pedra com 3 ou com 1. Se jogar a 1-5 na direita, a nova ponta passa a ser 5:</p>
-      <div class="demo felt"><span class="endmark">◀ <b>3</b></span>${T(3, 6, true)}${T(6, 6)}${T(6, 1, true)}${T(1, 5, true)}<span class="endmark"><b>5</b> ▶</span></div>
+      <div class="demo felt">${chainHTML(mark(3, 'L'), [T(3, 6, true), T(6, 6), T(6, 1, true), T(1, 5, true)], mark(5, 'R'))}</div>
       <p>Repare que ${w.o} <b>${w.s} entra atravessad${w.o}</b> (em pé), mas funciona igual: a ponta continua sendo o número dela.</p>`,
     quiz: (w) => ({
       q: 'As pontas são 3 e 1. Qual destas pedras você pode jogar?',
