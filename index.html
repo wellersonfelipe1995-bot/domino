@@ -26,11 +26,12 @@
   <label><input type="checkbox" id="optSpy"> 👀 Modo espiar (ver as pedras de todos — só para estudar)</label>
   <div class="namePicker" id="namePicker"></div>
   <label><input type="checkbox" id="optColors"> 🎨 Cores nos números</label>
-  <label>⏱️ Velocidade dos outros jogadores
+  <label>⏱️ Ritmo dos outros jogadores
     <select id="optSpeed">
-      <option value="1700">Devagar</option>
-      <option value="1000">Normal</option>
-      <option value="450">Rápida</option>
+      <option value="passo">Passo a passo (eu toco em Continuar)</option>
+      <option value="2500">Automático devagar</option>
+      <option value="1300">Automático normal</option>
+      <option value="600">Automático rápido</option>
     </select>
   </label>
 </div>
@@ -43,6 +44,7 @@
       <div class="seat top" id="seat2"></div>
       <div class="seat left" id="seat3"></div>
       <div id="boardWrap">
+        <div id="narr"><div id="narrAction">A partida vai começar…</div><div id="narrStatus"></div></div>
         <div id="board"></div>
         <div id="sideChoice"></div>
       </div>

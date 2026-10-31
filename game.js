@@ -70,7 +70,7 @@ function loadSettings() {
   try { return JSON.parse(localStorage.getItem('domino-settings') || '{}'); } catch (e) { return {}; }
 }
 const S = Object.assign(
-  { professor: true, spy: false, colors: true, speed: 1000, lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
+  { professor: true, spy: false, colors: true, pace: 'passo', lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
   loadSettings()
 );
 function saveSettings() {
@@ -124,6 +124,7 @@ function newHand() {
   const deck = shuffle(ALL.map((t) => ({ ...t })));
   G.hands = [0, 1, 2, 3].map((i) => deck.slice(i * 7, i * 7 + 7).sort(sortTiles));
   G.board = [];
+  G.origin = 0; // índice da primeira pedra jogada (o centro da mesa)
   G.lacks = [0, 1, 2, 3].map(() => new Set());
   G.over = false;
   G.selected = null;
@@ -142,6 +143,7 @@ function newHand() {
         : `Quem ganhou a mão anterior começa com qualquer pedra: <b>${SEAT[start]}</b>.`),
     'tip'
   );
+  narrate(`🃏 <b>Mão ${G.handNo}</b> começou: cada um tem 7 pedras. Quem começa: <b>${SEAT[start]}</b>.`);
   nextTurn();
 }
 
@@ -321,12 +323,15 @@ function evaluate(p) {
 }
 
 /* ---------------- Fluxo da partida ---------------- */
+function botDelay() { return S.pace === 'passo' ? 900 : +S.pace || 1300; }
+
 function nextTurn() {
   if (G.over) return;
   render();
   const p = G.turn;
   const moves = legal(p);
-  if (p === 0) { humanTurn(moves); return; }
+  if (p === 0) { narrateStatus('👉 <b>Sua vez!</b>'); humanTurn(moves); return; }
+  narrateStatus(`⏳ Vez de <b>${SEAT[p]}</b>${p === 2 ? ' (seu parceiro)' : ' (adversário)'}… pensando`);
   const g = gen;
   setTimeout(() => {
     if (g !== gen || G.over) return;
@@ -335,31 +340,50 @@ function nextTurn() {
       const ev = evaluate(p).map((e) => ({ ...e, s: e.s + Math.random() * 1.2 })).sort((x, y) => y.s - x.s);
       doPlay(p, ev[0].m);
     }
-  }, S.speed);
+  }, botDelay());
 }
 
 function advance() {
+  const prev = G.turn;
   G.turn = (G.turn + 1) % 4;
+  // No modo passo a passo, entre duas jogadas dos outros o jogo espera você tocar em "Continuar".
+  if (S.pace === 'passo' && prev !== 0 && G.turn !== 0) {
+    render();
+    const g = gen;
+    narrateStatus(`Próximo: <b>${SEAT[G.turn]}</b>. <button id="btnCont" class="big primary">Continuar ▶</button>`);
+    $('#btnCont').onclick = () => { if (g === gen && !G.over) nextTurn(); };
+    return;
+  }
   nextTurn();
 }
 
-function sideName(side) { return side === 'L' ? 'ponta esquerda' : 'ponta direita'; }
+// "ponta do 4" — com a mesa em curva, "esquerda/direita" confunde; o número da ponta não.
+function sideName(side, e = ends()) { return `ponta do ${side === 'L' ? e[0] : e[1]}`; }
+
+function narrate(html) { $('#narrAction').innerHTML = html; }
+function narrateStatus(html) { $('#narrStatus').innerHTML = html; }
 
 function doPlay(p, m) {
   const t = m.t;
   const prev = ends();
   G.hands[p] = G.hands[p].filter((x) => x !== t);
-  if (!G.board.length) G.board.push({ a: t.a, b: t.b, p });
-  else if (m.side === 'L') G.board.unshift({ a: otherSide(t, prev[0]), b: prev[0], p });
-  else G.board.push({ a: prev[1], b: otherSide(t, prev[1]), p });
-  G.lastPlayer = p;
-  G.lastTile = tid(t);
+  let entry;
+  if (!G.board.length) G.board.push((entry = { a: t.a, b: t.b, p }));
+  else if (m.side === 'L') { G.board.unshift((entry = { a: otherSide(t, prev[0]), b: prev[0], p })); G.origin++; }
+  else G.board.push((entry = { a: prev[1], b: otherSide(t, prev[1]), p }));
+  G.lastEntry = entry;
+  G.animEntry = entry;
+  const now = ends();
+  const who = p === 0 ? '<b>Você</b> jogou' : `<b>${SEAT[p]}</b> jogou`;
+  narrate(prev
+    ? `${who} ${miniTile(tid(t))} na ${sideName(m.side, prev)}. Agora as pontas são <b class="endnum">${now[0]}</b> e <b class="endnum">${now[1]}</b>.`
+    : `${who} ${miniTile(tid(t))} para abrir a mesa. As pontas são <b class="endnum">${now[0]}</b> e <b class="endnum">${now[1]}</b>.`);
   G.mustSix = false;
   G.selected = null;
   G.suggest = null;
 
   if (p !== 0) {
-    say(`${SEAT[p]} jogou ${T(t.a, t.b, true)} ${prev ? 'na ' + sideName(m.side) : 'para abrir a mesa'}.`, '', true);
+    say(`${SEAT[p]} jogou ${T(t.a, t.b, true)} ${prev ? 'na ' + sideName(m.side, prev) : 'para abrir a mesa'}.`, '', true);
   }
 
   if (!G.hands[p].length) {
@@ -382,6 +406,7 @@ function doPass(p) {
   const fresh = nums.filter((n) => !G.lacks[p].has(n));
   nums.forEach((n) => G.lacks[p].add(n));
   bubble(p, 'PASSOU!');
+  narrate(`✋ <b>${p === 0 ? 'Você passou' : SEAT[p] + ' passou'}</b> — ${p === 0 ? 'você' : 'ele'} não tem nenhuma pedra com ${listNums(nums)}.`);
   if (p === 0) {
     say(`Você passou. ⚠️ Agora todos sabem que você não tem ${listNums(nums)}.`, 'alert');
   } else {
@@ -460,12 +485,11 @@ function onHandClick(id) {
   if (opts.length === 1) { humanPlay(opts[0]); return; }
   G.selected = t;
   render();
-  const e = ends();
   setProfNow(`Essa pedra serve nas <b>duas pontas</b>! Escolha onde jogar:<br>` +
-    `• na esquerda, as pontas ficam <b>${resultEnds(opts[0]).join(' e ')}</b><br>` +
-    `• na direita, as pontas ficam <b>${resultEnds(opts[1]).join(' e ')}</b>` +
+    `• na <b>${sideName('L')}</b>, as pontas ficam <b>${resultEnds(opts[0]).join(' e ')}</b><br>` +
+    `• na <b>${sideName('R')}</b>, as pontas ficam <b>${resultEnds(opts[1]).join(' e ')}</b><br>` +
+    'Toque no número da ponta na mesa ou nos botões abaixo dela.' +
     (S.professor ? '<br>Pense: qual número o próximo adversário não tem? Qual número você ainda tem na mão?' : ''));
-  void e;
 }
 
 function humanPlay(m) {
@@ -624,30 +648,11 @@ function render() {
   }
   document.querySelectorAll('#seat0 .tile').forEach((el) => { el.onclick = () => onHandClick(el.dataset.id); });
 
-  // Mesa
-  const board = $('#board');
-  if (!G.board.length) {
-    board.innerHTML = '<div class="empty-board">A mesa está vazia.<br>Esperando a primeira pedra…</div>';
-  } else {
-    const [L, R] = ends();
-    const selOpts = G.selected ? legal(0).filter((m) => m.t === G.selected) : [];
-    const canL = selOpts.some((m) => m.side === 'L');
-    const canR = selOpts.some((m) => m.side === 'R');
-    const markL = `<div class="endmark ${canL ? 'choose' : ''}" data-side="L">◀ <b>${L}</b></div>`;
-    const markR = `<div class="endmark ${canR ? 'choose' : ''}" data-side="R"><b>${R}</b> ▶</div>`;
-    const tiles = G.board.map((x) => {
-      const last = key(x.a, x.b) === G.lastTile && G.lastPlayer === x.p ? 'last' : '';
-      return tileHTML(x.a, x.b, { h: x.a !== x.b, cls: `p${x.p} ${last}` });
-    });
-    board.innerHTML = chainHTML(markL, tiles, markR);
-    board.querySelectorAll('.endmark.choose').forEach((el) => {
-      el.onclick = () => humanPlay(selOpts.find((m) => m.side === el.dataset.side));
-    });
-  }
+  renderBoard();
   const sc = $('#sideChoice');
   if (G.selected) {
     const selOpts = legal(0).filter((m) => m.t === G.selected);
-    sc.innerHTML = selOpts.map((m) => `<button class="big primary" data-side="${m.side}">${m.side === 'L' ? '◀ Jogar na esquerda' : 'Jogar na direita ▶'}</button>`).join('') +
+    sc.innerHTML = selOpts.map((m) => `<button class="big primary" data-side="${m.side}">Jogar na ${sideName(m.side)}</button>`).join('') +
       '<button class="big" data-side="X">Cancelar</button>';
     sc.querySelectorAll('button').forEach((b) => {
       b.onclick = () => {
@@ -664,6 +669,114 @@ function render() {
   renderCounter();
   renderReading();
   renderFeed();
+}
+
+/* ---------------- Desenho da mesa ----------------
+   Como numa mesa de verdade: a primeira pedra fica no centro e a fila cresce para os
+   dois lados. Quando chega na borda, a fila faz uma curva (desce uma pedra em pé) e
+   volta no sentido contrário. O braço da esquerda é o mesmo desenho girado 180°.
+   Coordenadas em "u" = metade de uma pedra. */
+function layoutArm(list, sx, across, X) {
+  let cx = sx;
+  let cy = 0;
+  let d = 'E';
+  let last = across;
+  const out = [];
+  for (const t of list) {
+    const dbl = t.e.a === t.e.b;
+    if (d === 'E') {
+      if (!dbl && cx + 2 > X) {
+        const x0 = cx - 1;
+        const y0 = cy + last;
+        out.push({ ...t, x: x0, y: y0, w: 1, h: 2, d: 'S' });
+        cx = x0; cy = y0 + 1.5; d = 'W'; last = 0.5;
+        continue;
+      }
+      if (dbl) { out.push({ ...t, x: cx, y: cy - 1, w: 1, h: 2, d }); cx += 1; last = 1; }
+      else { out.push({ ...t, x: cx, y: cy - 0.5, w: 2, h: 1, d }); cx += 2; last = 0.5; }
+    } else {
+      if (!dbl && cx - 2 < -X) {
+        const x0 = cx;
+        const y0 = cy + last;
+        out.push({ ...t, x: x0, y: y0, w: 1, h: 2, d: 'S' });
+        cx = x0 + 1; cy = y0 + 1.5; d = 'E'; last = 0.5;
+        continue;
+      }
+      if (dbl) { out.push({ ...t, x: cx - 1, y: cy - 1, w: 1, h: 2, d }); cx -= 1; last = 1; }
+      else { out.push({ ...t, x: cx - 2, y: cy - 0.5, w: 2, h: 1, d }); cx -= 2; last = 0.5; }
+    }
+  }
+  return { out, end: { x: cx, y: cy, d } };
+}
+
+const FLIP = { E: 'W', W: 'E', S: 'N', N: 'S' };
+function layoutBoard(X) {
+  const B = G.board;
+  const o = G.origin;
+  const c = B[o];
+  const cd = c.a === c.b;
+  const center = { e: c, near: c.a, far: c.b, x: cd ? -0.5 : -1, y: cd ? -1 : -0.5, w: cd ? 1 : 2, h: cd ? 2 : 1, d: 'E' };
+  const sx = cd ? 0.5 : 1;
+  const across = cd ? 1 : 0.5;
+  const right = layoutArm(B.slice(o + 1).map((e) => ({ e, near: e.a, far: e.b })), sx, across, X);
+  const left = layoutArm(B.slice(0, o).reverse().map((e) => ({ e, near: e.b, far: e.a })), sx, across, X);
+  const leftItems = left.out.map((it) => ({ ...it, x: -(it.x + it.w), y: -(it.y + it.h), d: FLIP[it.d] }));
+  return {
+    items: [...leftItems, center, ...right.out],
+    endL: { x: -left.end.x, y: -left.end.y, d: FLIP[left.end.d] },
+    endR: right.end,
+  };
+}
+
+function boardTileHTML(it, cls) {
+  const { near, far, d } = it;
+  if (near === far) return tileHTML(near, far, { h: d === 'S' || d === 'N', cls });
+  if (d === 'E') return tileHTML(near, far, { h: true, cls });
+  if (d === 'W') return tileHTML(far, near, { h: true, cls });
+  if (d === 'S') return tileHTML(near, far, { cls });
+  return tileHTML(far, near, { cls });
+}
+
+function renderBoard() {
+  const board = $('#board');
+  if (!G.board.length) {
+    board.style.height = '';
+    board.innerHTML = '<div class="empty-board">A mesa está vazia.<br>Esperando a primeira pedra…</div>';
+    return;
+  }
+  const W = board.clientWidth || 320;
+  const u = Math.max(14, Math.min(32, Math.floor(W / 16)));
+  const X = Math.max(3, Math.floor(W / 2 / u - 1.6)); // deixa espaço para o número da ponta
+  const lay = layoutBoard(X);
+  const [L, R] = ends();
+  const selOpts = G.selected ? legal(0).filter((m) => m.t === G.selected) : [];
+  const badges = [
+    { side: 'L', num: L, ...lay.endL },
+    { side: 'R', num: R, ...lay.endR },
+  ].map((b) => ({ ...b, bx: b.x + (b.d === 'E' ? 0.9 : -0.9), by: b.y }));
+  let minY = Math.min(...lay.items.map((i) => i.y), ...badges.map((b) => b.by - 0.8));
+  let maxY = Math.max(...lay.items.map((i) => i.y + i.h), ...badges.map((b) => b.by + 0.8));
+  const pad = u * 0.6;
+  const px = (x) => W / 2 + x * u;
+  const py = (y) => (y - minY) * u + pad;
+  let html = '';
+  for (const it of lay.items) {
+    let cls = `p${it.e.p}`;
+    if (it.e === G.lastEntry) cls += ' last';
+    if (it.e === G.animEntry) cls += ' enter';
+    html += `<div class="bt" style="left:${px(it.x)}px;top:${py(it.y)}px">${boardTileHTML(it, cls)}</div>`;
+  }
+  G.animEntry = null;
+  for (const b of badges) {
+    const can = selOpts.some((m) => m.side === b.side);
+    html += `<div class="endbadge ${can ? 'choose' : ''}" data-side="${b.side}" style="left:${px(b.bx)}px;top:${py(b.by)}px" title="Ponta do ${b.num}">${b.num}</div>`;
+  }
+  board.style.setProperty('--u', u + 'px');
+  board.style.height = (maxY - minY) * u + 2 * pad + 'px';
+  board.innerHTML = html;
+  board.querySelectorAll('.endbadge.choose').forEach((el) => {
+    el.onclick = () => humanPlay(selOpts.find((m) => m.side === el.dataset.side));
+  });
 }
 
 function renderCounter() {
@@ -994,11 +1107,12 @@ function initUI() {
   $('#optProfessor').checked = S.professor;
   $('#optSpy').checked = S.spy;
   $('#optColors').checked = S.colors;
-  $('#optSpeed').value = String(S.speed);
+  $('#optSpeed').value = String(S.pace);
   $('#optProfessor').onchange = (e) => { S.professor = e.target.checked; saveSettings(); render(); };
   $('#optSpy').onchange = (e) => { S.spy = e.target.checked; saveSettings(); render(); };
   $('#optColors').onchange = (e) => { S.colors = e.target.checked; saveSettings(); render(); if (!$('#lessons').classList.contains('hidden')) renderLesson(); };
-  $('#optSpeed').onchange = (e) => { S.speed = +e.target.value; saveSettings(); };
+  $('#optSpeed').onchange = (e) => { S.pace = e.target.value; saveSettings(); };
+  window.addEventListener('resize', () => { if (G && !$('#game').classList.contains('hidden')) renderBoard(); });
   renderNamePicker($('#namePicker'));
   $('#btnSettings').onclick = () => $('#settings').classList.toggle('hidden');
   $('#btnLessons').onclick = () => openLessons(Math.min(Math.max(S.lessonDone + 1, 0), LESSONS.length - 1));

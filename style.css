@@ -146,31 +146,53 @@ main { padding: 10px; }
 
 /* ---------- Tabuleiro ---------- */
 #board {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
+  position: relative;
   --u: 28px;
-  padding: 8px;
   min-height: 120px;
+  margin: 4px 0;
 }
-@media (max-width: 520px) { #board { --u: 20px; } }
+#board .bt { position: absolute; }
 #board .tile { border-bottom-width: 3px; }
 #board .tile.p0, #board .tile.p2 { border-bottom-color: #42a5f5; }
 #board .tile.p1, #board .tile.p3 { border-bottom-color: #ef5350; }
-#board .tile.last { box-shadow: 0 0 0 3px #ffd54f, 0 2px 4px rgba(0,0,0,.4); }
-.endmark {
-  background: rgba(0,0,0,.45);
-  color: #fff;
-  border-radius: 10px;
-  padding: 4px 8px;
-  font-size: .9em;
-  white-space: nowrap;
+#board .tile.last { box-shadow: 0 0 0 3px #ffd54f, 0 0 14px #ffd54f; }
+#board .tile.enter { animation: drop .7s ease-out; }
+@keyframes drop {
+  0% { transform: scale(1.8); opacity: 0; }
+  60% { transform: scale(.95); opacity: 1; }
+  100% { transform: scale(1); }
 }
-.endmark b { font-size: 1.3em; color: #ffd54f; }
-.endmark.choose { background: #00acc1; cursor: pointer; animation: glow 1s ease-in-out infinite alternate; }
+.endbadge {
+  position: absolute;
+  width: calc(var(--u) * 1.4);
+  height: calc(var(--u) * 1.4);
+  margin: calc(var(--u) * -0.7) 0 0 calc(var(--u) * -0.7);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .55);
+  color: #ffd54f;
+  font-weight: 800;
+  font-size: calc(var(--u) * .8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffd54f;
+  z-index: 2;
+}
+.endbadge.choose { background: #00acc1; color: #fff; border-color: #fff; cursor: pointer; animation: glow 1s ease-in-out infinite alternate; }
 .empty-board { opacity: .8; text-align: center; font-size: 1.05em; padding: 20px; }
+#narr {
+  background: rgba(0, 0, 0, .35);
+  border-radius: 12px;
+  padding: 8px 10px;
+  text-align: center;
+  line-height: 1.5;
+  --u: 13px;
+}
+#narrAction { font-size: 1.05em; }
+#narrAction .endnum { color: #ffd54f; font-size: 1.2em; }
+#narrStatus { font-size: .92em; opacity: .9; margin-top: 2px; }
+#narrStatus:empty { display: none; }
+#narrStatus button { margin-left: 6px; padding: 8px 16px; }
 #sideChoice { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 
 /* ---------- Pedras ---------- */
@@ -344,3 +366,30 @@ table.pts td .demo { margin: 0; padding: 4px; }
   .demo .glue { gap: 4px; }
   .demo .endmark { padding: 3px 6px; }
 }
+
+/* No celular: os três jogadores em cima, a mesa ocupa a largura toda */
+@media (max-width: 600px) {
+  #table {
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-areas:
+      "left top right"
+      "board board board"
+      "bottom bottom bottom"
+      "actions actions actions";
+    min-height: 0;
+  }
+  .seat.left, .seat.right { max-width: none; }
+  .seat.top .tiles.backs { --u: 9px; }
+  #boardWrap { min-height: 160px; }
+}
+
+/* Marcadores de ponta usados nas aulas */
+.endmark {
+  background: rgba(0,0,0,.45);
+  color: #fff;
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: .9em;
+  white-space: nowrap;
+}
+.endmark b { font-size: 1.3em; color: #ffd54f; }
