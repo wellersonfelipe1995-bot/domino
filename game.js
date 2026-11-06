@@ -6,8 +6,16 @@
 
 const $ = (s) => document.querySelector(s);
 const NUM = ['branco', 'ás', 'duque', 'terno', 'quadra', 'quina', 'sena'];
-const SEAT = ['Você', 'Seu Zé', 'Tonhão', 'Dona Cida'];
-const SEAT_LONG = ['você', 'Seu Zé (adversário)', 'seu parceiro Tonhão', 'Dona Cida (adversária)'];
+// Nomes dos jogadores (editáveis tocando no nome; ficam guardados nas opções).
+const DEFAULT_NAMES = ['Você', 'Seu Zé', 'Tonhão', 'Dona Cida'];
+const SEAT = DEFAULT_NAMES.slice();
+const SEAT_LONG = ['você', '', '', ''];
+function applyNames() {
+  for (const p of [1, 2, 3]) SEAT[p] = (S.names && S.names[p]) || DEFAULT_NAMES[p];
+  SEAT_LONG[1] = `${SEAT[1]} (adversário)`;
+  SEAT_LONG[2] = `seu parceiro ${SEAT[2]}`;
+  SEAT_LONG[3] = `${SEAT[3]} (adversária)`;
+}
 const PRON = ['você', 'ele', 'ele', 'ela'];
 const ROLE = ['', 'adversário', 'parceiro', 'adversária'];
 const TARGET = 6; // pontos para vencer a partida
@@ -131,7 +139,9 @@ const S = Object.assign(
   { professor: true, spy: false, colors: true, pace: 'passo', sound: true, anim: true, level: 'facil', lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
   loadSettings()
 );
+applyNames();
 function saveSettings() {
+  applyNames();
   try { localStorage.setItem('domino-settings', JSON.stringify(S)); } catch (e) { /* sem armazenamento: tudo bem */ }
 }
 
@@ -801,6 +811,37 @@ function showHint() {
   setProfNow(html);
 }
 
+/* ---------------- Mudar o nome de um jogador ---------------- */
+function escapeHTML(t) { return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+function editName(p) {
+  const role = p === 2 ? 'seu parceiro' : ROLE[p];
+  const box = document.createElement('div');
+  box.id = 'nameEdit';
+  box.innerHTML = `<form class="nameEditBox">
+      <span class="av-big">${avatarSVG(p)}</span>
+      <label>Nome do ${p === 3 ? 'jogador (adversária)' : `jogador (${role})`}:</label>
+      <input type="text" maxlength="14" value="${escapeHTML(SEAT[p])}" autocomplete="off">
+      <div class="btns"><button type="submit" class="primary big">Salvar</button>
+      <button type="button" class="np-reset">Voltar para "${DEFAULT_NAMES[p]}"</button>
+      <button type="button" class="np-cancel">Cancelar</button></div></form>`;
+  document.body.appendChild(box);
+  const input = box.querySelector('input');
+  input.focus();
+  input.select();
+  const close = () => box.remove();
+  const save = (name) => {
+    S.names = Object.assign({}, S.names, { [p]: name.replace(/[<>&"']/g, '').trim().slice(0, 14) || DEFAULT_NAMES[p] });
+    saveSettings();
+    close();
+    render();
+  };
+  box.querySelector('form').onsubmit = (e) => { e.preventDefault(); save(input.value); };
+  box.querySelector('.np-reset').onclick = () => save(DEFAULT_NAMES[p]);
+  box.querySelector('.np-cancel').onclick = close;
+  box.onclick = (e) => { if (e.target === box) close(); };
+}
+
 /* ---------------- Fim de mão ---------------- */
 function endHand(r) {
   if (G.over && G.lastResult === r) { showModal(G.lastModal); bindEndButton(); return; }
@@ -851,8 +892,8 @@ function endHand(r) {
     const won = G.score[0] >= TARGET;
     title = won ? '🏆 Vocês venceram a partida!' : '😏 Os adversários venceram a partida';
     body = (won
-      ? `<div class="party"><span class="av-big dance">${avatarSVG(2)}</span><span class="party-txt">🎉🥳🎉</span></div><p><b>É festa!</b> Você e o Tonhão levaram a partida!</p>`
-      : `<div class="party lose"><span class="av-big smug">${avatarSVG(1)}</span><span class="av-big smug">${avatarSVG(3)}</span></div><p>Seu Zé e Dona Cida comemoram… mas a revanche é sua! 😉</p>`) + body;
+      ? `<div class="party"><span class="av-big dance">${avatarSVG(2)}</span><span class="party-txt">🎉🥳🎉</span></div><p><b>É festa!</b> Você e ${SEAT[2]} levaram a partida!</p>`
+      : `<div class="party lose"><span class="av-big smug">${avatarSVG(1)}</span><span class="av-big smug">${avatarSVG(3)}</span></div><p>${SEAT[1]} e ${SEAT[3]} comemoram… mas a revanche é sua! 😉</p>`) + body;
     const lv = LEVELS[S.level] || LEVELS.facil;
     const up = { facil: 'medio', medio: 'dificil' }[S.level];
     const down = { dificil: 'medio', medio: 'facil' }[S.level];
@@ -946,13 +987,14 @@ function render() {
       // Enxuto: boneco com o número de pedras no cantinho, o nome e o que ele não tem.
       // As pedras só aparecem viradas para cima no modo espiar ou no fim da mão.
       el.title = `${SEAT[p]} — ${p === 2 ? 'seu parceiro' : ROLE[p]} — ${n} ${n === 1 ? 'pedra' : 'pedras'}`;
-      el.innerHTML = `<div class="avatar-wrap"><div class="avatar">${avatarSVG(p)}</div><span class="count" title="${n} pedras na mão"><i></i>${n}</span></div>` +
-        `<div class="name ${nameCls}">${SEAT[p]}</div>` +
-        (hidden ? '' : `<div class="tiles">${tiles}</div>`) +
+      el.innerHTML = `<button type="button" class="name editname ${nameCls}" data-p="${p}" title="Toque para mudar o nome">${escapeHTML(SEAT[p])}</button>` +
+        `<div class="avatar-wrap"><div class="avatar">${avatarSVG(p)}</div><span class="count" title="${n} pedras na mão"><i></i>${n}</span></div>` +
+        `<div class="tiles ${hidden ? 'backs' : ''}">${tiles}</div>` +
         (lacks.length ? `<div class="chips"><span class="chip no" title="Não tem nenhuma pedra com ${lacks.join(', ')}">sem ${lacks.join(' ')}</span></div>` : '');
     }
     bubbles.forEach((b) => el.appendChild(b));
   }
+  document.querySelectorAll('.seat .editname').forEach((b) => { b.onclick = () => editName(+b.dataset.p); });
   document.querySelectorAll('#seat0 .tile').forEach((el) => {
     el.onclick = () => { if (!dragJustEnded) onHandClick(el.dataset.id); };
     setupDrag(el);
@@ -1377,8 +1419,8 @@ function hideModal() { $('#modal').classList.add('hidden'); }
    ========================================================= */
 const seatMap = () => `
 <div class="seatmap">
-  <div></div><div class="us"><span class="av-big">${avatarSVG(2)}</span>Tonhão<br><small>seu parceiro</small></div><div></div>
-  <div class="them"><span class="av-big">${avatarSVG(3)}</span>Dona Cida<br><small>adversária (esquerda)</small></div><div class="tbl">mesa</div><div class="them"><span class="av-big">${avatarSVG(1)}</span>Seu Zé<br><small>adversário (direita)</small></div>
+  <div></div><div class="us"><span class="av-big">${avatarSVG(2)}</span>${SEAT[2]}<br><small>seu parceiro</small></div><div></div>
+  <div class="them"><span class="av-big">${avatarSVG(3)}</span>${SEAT[3]}<br><small>adversária (esquerda)</small></div><div class="tbl">mesa</div><div class="them"><span class="av-big">${avatarSVG(1)}</span>${SEAT[1]}<br><small>adversário (direita)</small></div>
   <div></div><div class="us">Você</div><div></div>
 </div>`;
 
@@ -1412,7 +1454,8 @@ const LESSONS = [
       <ul>
         <li>Cada jogador recebe <b>7 pedras</b>. Como 4 × 7 = 28, todas as pedras são distribuídas — <b>ninguém compra</b>.</li>
         <li>No jogo, a sua dupla veste <b style="color:#64b5f6">azul</b> e os adversários, <b style="color:#ef5350">vermelho</b>.</li>
-        <li>A vez passa sempre na mesma ordem: <b>Você → Seu Zé (direita) → Tonhão (parceiro) → Dona Cida (esquerda)</b> → Você…</li>
+        <li>A vez passa sempre na mesma ordem: <b>Você → ${SEAT[1]} (direita) → ${SEAT[2]} (parceiro) → ${SEAT[3]} (esquerda)</b> → Você…</li>
+        <li>Quer usar o nome dos seus parceiros de jogo de verdade? No jogo, é só <b>tocar no nome</b> de alguém para mudar.</li>
         <li>Você <b>não vê</b> as pedras do parceiro e não pode falar delas. A conversa entre a dupla é feita <b>pelas jogadas</b>.</li>
         <li>Os pontos são da dupla: se o seu parceiro bate, você também ganha.</li>
       </ul>`,
@@ -1420,7 +1463,7 @@ const LESSONS = [
       q: 'Você acabou de jogar. Quem joga agora?',
       opts: [
         { html: 'O parceiro', why: 'Não: entre você e o parceiro sempre joga um adversário.' },
-        { html: 'Seu Zé, o adversário da direita', ok: true, why: 'Isso! A ordem é Você → Seu Zé → Tonhão → Dona Cida.' },
+        { html: `${SEAT[1]}, o adversário da direita`, ok: true, why: `Isso! A ordem é Você → ${SEAT[1]} → ${SEAT[2]} → ${SEAT[3]}.` },
         { html: 'Quem quiser', why: 'Não, a ordem é sempre a mesma.' },
       ],
     }),
