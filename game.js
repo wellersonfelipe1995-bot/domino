@@ -6,8 +6,10 @@
 
 const $ = (s) => document.querySelector(s);
 const NUM = ['branco', 'ás', 'duque', 'terno', 'quadra', 'quina', 'sena'];
-const SEAT = ['Você', 'Direita', 'Parceiro', 'Esquerda'];
-const SEAT_LONG = ['você', 'o adversário da Direita', 'seu Parceiro', 'o adversário da Esquerda'];
+const SEAT = ['Você', 'Seu Zé', 'Tonhão', 'Dona Cida'];
+const SEAT_LONG = ['você', 'Seu Zé (adversário)', 'seu parceiro Tonhão', 'Dona Cida (adversária)'];
+const PRON = ['você', 'ele', 'ele', 'ela'];
+const ROLE = ['', 'adversário', 'parceiro', 'adversária'];
 const TARGET = 6; // pontos para vencer a partida
 const teamOf = (p) => p % 2; // 0 = Nós (você e parceiro), 1 = Eles
 
@@ -65,12 +67,68 @@ function chainHTML(markL, tiles, markR) {
 const mark = (n, side) => (side === 'L' ? `<span class="endmark">◀ <b>${n}</b></span>` : `<span class="endmark"><b>${n}</b> ▶</span>`);
 const backHTML = () => '<div class="tile v back"></div>';
 
+/* ---------------- Personagens ----------------
+   Cada jogador é um boneco diferente; a cor da camisa mostra o time
+   (azul = sua dupla, vermelho = adversários). */
+function avatarSVG(p) {
+  const body = (shirt, skin, wide) => (wide
+    ? `<path d="M3 64 C5 48 17 43 32 43 C47 43 59 48 61 64 Z" fill="${shirt}"/>`
+    : `<path d="M9 64 C11 50 20 45 32 45 C44 45 53 50 55 64 Z" fill="${shirt}"/>`) +
+    `<rect x="27" y="36" width="10" height="11" rx="3" fill="${skin}"/>`;
+  const eyes = '<circle cx="27" cy="28" r="1.9" fill="#222"/><circle cx="37" cy="28" r="1.9" fill="#222"/>';
+  if (p === 1) { // Seu Zé: senhor de boina e bigodão branco
+    const skin = '#dfa877';
+    return `<svg viewBox="0 0 64 64" aria-label="Seu Zé">${body('#e53935', skin)}
+      <path d="M26 45 L32 52 L38 45 Z" fill="#fff"/>
+      <circle cx="18" cy="29" r="3.2" fill="${skin}"/><circle cx="46" cy="29" r="3.2" fill="${skin}"/>
+      <circle cx="32" cy="28" r="13.5" fill="${skin}"/>
+      <ellipse cx="19.5" cy="25" rx="3" ry="5" fill="#d9d9d9"/><ellipse cx="44.5" cy="25" rx="3" ry="5" fill="#d9d9d9"/>
+      <path d="M17 22 Q32 5 47 22 Z" fill="#6d4c41"/>
+      <path d="M14 23 Q32 16 50 23 L50 25.5 Q32 20 14 25.5 Z" fill="#4e342e"/>
+      <path d="M24.5 24.5 L29.5 25" stroke="#bbb" stroke-width="1.6" stroke-linecap="round"/><path d="M34.5 25 L39.5 24.5" stroke="#bbb" stroke-width="1.6" stroke-linecap="round"/>
+      ${eyes}<ellipse cx="32" cy="31.5" rx="2.2" ry="2.6" fill="#c98b5c"/>
+      <path d="M23.5 35.5 Q27.5 31.5 32 34 Q36.5 31.5 40.5 35.5 Q36.5 38.5 32 36.5 Q27.5 38.5 23.5 35.5 Z" fill="#f2f2f2"/>
+      <path d="M28.5 39.5 Q32 41 35.5 39.5" stroke="#7a4b2a" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>`;
+  }
+  if (p === 2) { // Tonhão: grandão de barba e boné azul virado
+    const skin = '#8d5524';
+    return `<svg viewBox="0 0 64 64" aria-label="Tonhão">${body('#1e88e5', skin, true)}
+      <path d="M22 44 Q32 50 42 44" stroke="#1565c0" stroke-width="2.5" fill="none"/>
+      <circle cx="17" cy="29" r="3.4" fill="${skin}"/><circle cx="47" cy="29" r="3.4" fill="${skin}"/>
+      <circle cx="32" cy="28" r="15" fill="${skin}"/>
+      <path d="M17 27 Q17 45 32 46 Q47 45 47 27 Q45 38 32 39 Q19 38 17 27 Z" fill="#2b1a10"/>
+      <path d="M17 24 Q32 6 47 24 Z" fill="#1e88e5"/><rect x="11" y="21" width="13" height="4.5" rx="2.2" fill="#1565c0"/>
+      <path d="M24 24.5 L30 23.5" stroke="#2b1a10" stroke-width="2.4" stroke-linecap="round"/><path d="M34 23.5 L40 24.5" stroke="#2b1a10" stroke-width="2.4" stroke-linecap="round"/>
+      ${eyes}<ellipse cx="32" cy="32" rx="2.6" ry="2.2" fill="#6b3f1a"/>
+      <path d="M26.5 35.5 Q32 41 37.5 35.5 Z" fill="#fff" stroke="#2b1a10" stroke-width="1"/></svg>`;
+  }
+  if (p === 3) { // Dona Cida: cabelo cacheado, óculos e brincos
+    const skin = '#f1c27d';
+    const hair = '#5d2e46';
+    const curls = [[19, 22, 8], [24, 14, 8], [32, 11, 8.5], [40, 14, 8], [45, 22, 8], [16, 31, 6.5], [48, 31, 6.5], [17, 39, 5], [47, 39, 5]]
+      .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="${hair}"/>`).join('');
+    return `<svg viewBox="0 0 64 64" aria-label="Dona Cida">${curls}${body('#e53935', skin)}
+      <path d="M27 45 Q32 51 37 45" fill="${skin}"/>
+      <circle cx="32" cy="29" r="13" fill="${skin}"/>
+      <circle cx="25" cy="18.5" r="4.5" fill="${hair}"/><circle cx="31" cy="16.5" r="4.5" fill="${hair}"/><circle cx="37.5" cy="17.5" r="4.5" fill="${hair}"/>
+      <circle cx="19.5" cy="35" r="1.8" fill="#ffd54f"/><circle cx="44.5" cy="35" r="1.8" fill="#ffd54f"/>
+      ${eyes}
+      <circle cx="27" cy="28" r="4.3" fill="none" stroke="#333" stroke-width="1.4"/><circle cx="37" cy="28" r="4.3" fill="none" stroke="#333" stroke-width="1.4"/>
+      <path d="M31.3 28 L32.7 28" stroke="#333" stroke-width="1.4"/>
+      <path d="M31 31 Q32 33.5 33 31" stroke="#c98b5c" stroke-width="1.2" fill="none"/>
+      <path d="M27.5 36 Q32 39.5 36.5 36 Q32 37.5 27.5 36 Z" fill="#c62828" stroke="#c62828" stroke-width="1.2" stroke-linejoin="round"/>
+      <circle cx="23" cy="33" r="2" fill="#f48fb1" opacity=".5"/><circle cx="41" cy="33" r="2" fill="#f48fb1" opacity=".5"/></svg>`;
+  }
+  return '';
+}
+const avatarMini = (p) => (p ? `<span class="av-mini">${avatarSVG(p)}</span>` : '');
+
 /* ---------------- Configurações ---------------- */
 function loadSettings() {
   try { return JSON.parse(localStorage.getItem('domino-settings') || '{}'); } catch (e) { return {}; }
 }
 const S = Object.assign(
-  { professor: true, spy: false, colors: true, pace: 'passo', sound: true, level: 'facil', lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
+  { professor: true, spy: false, colors: true, pace: 'passo', sound: true, anim: true, level: 'facil', lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
   loadSettings()
 );
 function saveSettings() {
@@ -214,9 +272,10 @@ function newHand() {
         : `Quem ganhou a mão anterior começa com qualquer pedra: <b>${SEAT[start]}</b>.`),
     'tip'
   );
-  narrate(`🃏 <b>Mão ${G.handNo}</b> começou: cada um tem 7 pedras. Quem começa: <b>${SEAT[start]}</b>.` +
-    (G.handNo === 1 ? `<br><small>Adversários no nível <b>${(LEVELS[S.level] || LEVELS.facil).name}</b> (muda em ⚙️ Opções).</small>` : ''));
-  nextTurn();
+  const startMsg = `🃏 <b>Mão ${G.handNo}</b> começou: cada um tem 7 pedras. Quem começa: ${avatarMini(start)} <b>${SEAT[start]}</b>.` +
+    (G.handNo === 1 ? `<br><small>Adversários no nível <b>${(LEVELS[S.level] || LEVELS.facil).name}</b> (muda em ⚙️ Opções).</small>` : '');
+  render();
+  rollTiles(() => { narrate(startMsg); nextTurn(); });
 }
 
 function ends() {
@@ -355,7 +414,7 @@ function evaluate(p) {
     const oppLack = endNums.filter((n) => G.lacks[opp].has(n));
     if (oppLack.length === endNums.length) {
       s += 12;
-      why.push(`${cap(SEAT_LONG[opp])} (que joga logo depois) já passou e não tem ${listNums(endNums)}: ele vai ter que PASSAR de novo!`);
+      why.push(`${cap(SEAT_LONG[opp])} (que joga logo depois) já passou e não tem ${listNums(endNums)}: ${PRON[opp]} vai ter que PASSAR de novo!`);
     } else if (oppLack.length) {
       s += 4;
       why.push(`Deixa na ponta o ${listNums(oppLack)}, que ${SEAT_LONG[opp]} (próximo a jogar) não tem.`);
@@ -394,6 +453,72 @@ function evaluate(p) {
   return res.sort((x, y) => y.s - x.s);
 }
 
+/* ---------------- Rolar as pedras ----------------
+   No começo de cada mão as 28 pedras viradas são "roladas" (misturadas) na mesa,
+   como na roda, e depois vão 7 para cada jogador. Tocar na mesa pula a animação. */
+function rollTiles(done) {
+  document.querySelectorAll('.shuffle').forEach((x) => x.remove());
+  const g = gen;
+  if (!S.anim || $('#game').classList.contains('hidden')) { done(); return; }
+  const wrap = $('#boardWrap');
+  const ov = document.createElement('div');
+  ov.className = 'shuffle';
+  wrap.appendChild(ov);
+  // as pedras rolam na área da mesa, abaixo da faixa de narração
+  const top = $('#narr').offsetTop + $('#narr').offsetHeight + 6;
+  const W = wrap.clientWidth;
+  const H = Math.max(wrap.clientHeight - top - 30, 150);
+  const cx = W / 2;
+  const cy = top + H / 2;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const sx = Math.min(W * 0.36, 150);
+  const sy = Math.min(H * 0.32, 80);
+  $('#table').classList.add('dealing');
+  narrate('🎲 <b>Rolando as pedras…</b>');
+  narrateStatus('<small>toque na mesa para pular</small>');
+  const tiles = [];
+  for (let i = 0; i < 28; i++) {
+    const el = document.createElement('div');
+    el.className = 'tile v back';
+    ov.appendChild(el);
+    tiles.push(el);
+  }
+  let finished = false;
+  const timers = [];
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    timers.forEach(clearTimeout);
+    ov.remove();
+    $('#table').classList.remove('dealing');
+    narrateStatus('');
+    if (g === gen) done();
+  };
+  ov.onclick = finish;
+  // mistura: cada pedra passeia pela mesa girando
+  tiles.forEach((el) => {
+    const kf = [];
+    for (let k = 0; k < 5; k++) kf.push({ transform: `translate(${cx + rnd(-sx, sx)}px, ${cy + rnd(-sy, sy)}px) rotate(${rnd(-180, 180)}deg)` });
+    el.animate(kf, { duration: 1500, easing: 'ease-in-out', fill: 'forwards' });
+  });
+  for (let k = 0; k < 9; k++) timers.push(setTimeout(() => soundClack(0.18 + Math.random() * 0.15), 80 + k * 160));
+  // distribui: 7 para cada um
+  timers.push(setTimeout(() => {
+    if (g !== gen) { finish(); return; }
+    narrate('🃏 <b>Distribuindo:</b> 7 pedras para cada um…');
+    const wr = wrap.getBoundingClientRect();
+    tiles.forEach((el, i) => {
+      const p = i % 4;
+      const r = $('#seat' + p).getBoundingClientRect();
+      const tx = r.left + r.width / 2 - wr.left;
+      const ty = r.top + r.height / 2 - wr.top;
+      el.animate([{ transform: getComputedStyle(el).transform }, { transform: `translate(${tx}px, ${ty}px) rotate(${p % 2 ? 90 : 0}deg) scale(.7)`, opacity: 0.15 }],
+        { duration: 420, delay: i * 30, easing: 'ease-in', fill: 'forwards' });
+    });
+    timers.push(setTimeout(finish, 28 * 30 + 480));
+  }, 1550));
+}
+
 /* ---------------- Fluxo da partida ---------------- */
 /* Nível dos adversários (o parceiro joga sempre bem, para ajudar você):
    fácil = qualquer pedra que encaixa; médio = metade das vezes a melhor jogada;
@@ -415,7 +540,7 @@ function nextTurn() {
   const p = G.turn;
   const moves = legal(p);
   if (p === 0) { narrateStatus('👉 <b>Sua vez!</b>'); humanTurn(moves); return; }
-  narrateStatus(`⏳ Vez de <b>${SEAT[p]}</b>${p === 2 ? ' (seu parceiro)' : ' (adversário)'}… pensando`);
+  narrateStatus(`⏳ Vez de ${avatarMini(p)} <b>${SEAT[p]}</b> (${p === 2 ? 'seu parceiro' : ROLE[p]})… pensando`);
   const g = gen;
   setTimeout(() => {
     if (g !== gen || G.over) return;
@@ -516,7 +641,7 @@ function doPlay(p, m) {
   soundClack(p === 0 ? 1 : 0.8);
   G.animEntry = entry;
   const now = ends();
-  const who = p === 0 ? '<b>Você</b> jogou' : `<b>${SEAT[p]}</b> jogou`;
+  const who = p === 0 ? '<b>Você</b> jogou' : `${avatarMini(p)} <b>${SEAT[p]}</b> jogou`;
   narrate(prev
     ? `${who} ${miniTile(tid(t))} na ${sideName(m.side, prev)}. Agora as pontas são <b class="endnum">${now[0]}</b> e <b class="endnum">${now[1]}</b>.`
     : `${who} ${miniTile(tid(t))} para abrir a mesa. As pontas são <b class="endnum">${now[0]}</b> e <b class="endnum">${now[1]}</b>.`);
@@ -549,7 +674,7 @@ function doPass(p) {
   nums.forEach((n) => G.lacks[p].add(n));
   bubble(p, 'PASSOU!');
   soundKnock();
-  narrate(`✋ <b>${p === 0 ? 'Você passou' : SEAT[p] + ' passou'}</b> — ${p === 0 ? 'você' : 'ele'} não tem nenhuma pedra com ${listNums(nums)}.`);
+  narrate(`✋ ${p === 0 ? '' : avatarMini(p) + ' '}<b>${p === 0 ? 'Você passou' : SEAT[p] + ' passou'}</b> — ${PRON[p]} não tem nenhuma pedra com ${listNums(nums)}.`);
   if (p === 0) {
     say(`Você passou. ⚠️ Agora todos sabem que você não tem ${listNums(nums)}.`, 'alert');
   } else {
@@ -713,7 +838,7 @@ function endHand(r) {
 
   body += '<h3>Pedras que sobraram</h3>';
   for (const p of [0, 1, 2, 3]) {
-    body += `<div class="handline"><span class="who" style="color:${teamOf(p) ? '#ef9a9a' : '#90caf9'}">${SEAT[p]}</span><span class="tiles">${G.hands[p].map((t) => T(t.a, t.b)).join('') || '—'}</span><span>${sums[p]} pts</span></div>`;
+    body += `<div class="handline"><span class="who" style="color:${teamOf(p) ? '#ef9a9a' : '#90caf9'}">${p ? avatarMini(p) + ' ' : ''}${SEAT[p]}</span><span class="tiles">${G.hands[p].map((t) => T(t.a, t.b)).join('') || '—'}</span><span>${sums[p]} pts</span></div>`;
   }
   body += `<p>Placar: <b style="color:#64b5f6">Nós ${G.score[0]}</b> × <b style="color:#ef5350">${G.score[1]} Eles</b> (vence quem chegar a ${TARGET}).</p>`;
 
@@ -781,7 +906,7 @@ function render() {
     const el = $('#seat' + p);
     el.classList.toggle('turn', G.turn === p && !G.over);
     const nameCls = teamOf(p) === 0 ? 'us' : 'them';
-    const label = p === 0 ? 'Você' : p === 2 ? '🤝 Parceiro' : `${SEAT[p]}<br><small>adversário</small>`;
+    const label = p === 0 ? 'Você' : `${SEAT[p]}<br><small>${ROLE[p]}</small>`;
     let tiles;
     const hidden = p !== 0 && !(S.spy || G.over);
     if (p === 0) {
@@ -799,7 +924,7 @@ function render() {
     const lacks = [...G.lacks[p]].sort();
     const chips = p === 0 ? '' : `<div class="chips">${lacks.map((n) => `<span class="chip no">sem ${n}</span>`).join('')}</div>`;
     const bubbles = [...el.querySelectorAll('.bubble')];
-    el.innerHTML = `<div class="name ${nameCls}">${label} · ${G.hands[p].length} ${G.hands[p].length === 1 ? "pedra" : "pedras"}</div><div class="tiles ${hidden ? 'backs' : ''}">${tiles}</div>${chips}`;
+    el.innerHTML = `${p === 0 ? '' : `<div class="avatar">${avatarSVG(p)}</div>`}<div class="name ${nameCls}">${label} · ${G.hands[p].length} ${G.hands[p].length === 1 ? "pedra" : "pedras"}</div><div class="tiles ${hidden ? 'backs' : ''}">${tiles}</div>${chips}`;
     bubbles.forEach((b) => el.appendChild(b));
   }
   document.querySelectorAll('#seat0 .tile').forEach((el) => {
@@ -1061,7 +1186,7 @@ function renderReading() {
   for (const q of [1, 2, 3]) {
     const lacks = [...G.lacks[q]].sort();
     const cert = a0.certain[q];
-    html += `<div class="rp"><span class="who" style="color:${teamOf(q) ? '#ef9a9a' : '#90caf9'}">${q === 2 ? 'Parceiro' : SEAT[q] + ' (adv.)'}</span> — ${G.hands[q].length} pedra(s)<br>`;
+    html += `<div class="rp"><span class="who" style="color:${teamOf(q) ? '#ef9a9a' : '#90caf9'}">${avatarMini(q)} ${SEAT[q]} (${q === 2 ? 'parceiro' : 'adv.'})</span> — ${G.hands[q].length} pedra(s)<br>`;
     html += lacks.length ? `Não tem: <b>${lacks.join(', ')}</b>` : '<span style="opacity:.7">Ainda não passou — nada se sabe.</span>';
     if (cert.length) html += `<br>Com certeza tem: ${cert.map(miniTile).join(' ')}`;
     html += '</div>';
@@ -1085,10 +1210,10 @@ function hideModal() { $('#modal').classList.add('hidden'); }
 /* =========================================================
    AULAS
    ========================================================= */
-const seatMap = `
+const seatMap = () => `
 <div class="seatmap">
-  <div></div><div class="us">🤝 Parceiro</div><div></div>
-  <div class="them">Esquerda<br><small>adversário</small></div><div class="tbl">mesa</div><div class="them">Direita<br><small>adversário</small></div>
+  <div></div><div class="us"><span class="av-big">${avatarSVG(2)}</span>Tonhão<br><small>seu parceiro</small></div><div></div>
+  <div class="them"><span class="av-big">${avatarSVG(3)}</span>Dona Cida<br><small>adversária (esquerda)</small></div><div class="tbl">mesa</div><div class="them"><span class="av-big">${avatarSVG(1)}</span>Seu Zé<br><small>adversário (direita)</small></div>
   <div></div><div class="us">Você</div><div></div>
 </div>`;
 
@@ -1118,10 +1243,11 @@ const LESSONS = [
     title: 'A mesa e as duplas',
     html: (w) => `
       <p>O dominó mais comum no Brasil é jogado por <b>4 pessoas em 2 duplas</b>. O seu <b>parceiro</b> senta na sua frente; os adversários ficam dos lados.</p>
-      ${seatMap}
+      ${seatMap()}
       <ul>
         <li>Cada jogador recebe <b>7 pedras</b>. Como 4 × 7 = 28, todas as pedras são distribuídas — <b>ninguém compra</b>.</li>
-        <li>A vez passa sempre na mesma ordem: <b>Você → Direita → Parceiro → Esquerda</b> → Você…</li>
+        <li>No jogo, a sua dupla veste <b style="color:#64b5f6">azul</b> e os adversários, <b style="color:#ef5350">vermelho</b>.</li>
+        <li>A vez passa sempre na mesma ordem: <b>Você → Seu Zé (direita) → Tonhão (parceiro) → Dona Cida (esquerda)</b> → Você…</li>
         <li>Você <b>não vê</b> as pedras do parceiro e não pode falar delas. A conversa entre a dupla é feita <b>pelas jogadas</b>.</li>
         <li>Os pontos são da dupla: se o seu parceiro bate, você também ganha.</li>
       </ul>`,
@@ -1129,7 +1255,7 @@ const LESSONS = [
       q: 'Você acabou de jogar. Quem joga agora?',
       opts: [
         { html: 'O parceiro', why: 'Não: entre você e o parceiro sempre joga um adversário.' },
-        { html: 'O adversário da Direita', ok: true, why: 'Isso! A ordem é Você → Direita → Parceiro → Esquerda.' },
+        { html: 'Seu Zé, o adversário da direita', ok: true, why: 'Isso! A ordem é Você → Seu Zé → Tonhão → Dona Cida.' },
         { html: 'Quem quiser', why: 'Não, a ordem é sempre a mesma.' },
       ],
     }),
@@ -1375,6 +1501,8 @@ function initUI() {
   $('#optSpy').checked = S.spy;
   $('#optColors').checked = S.colors;
   $('#optSound').checked = S.sound;
+  $('#optAnim').checked = S.anim;
+  $('#optAnim').onchange = (e) => { S.anim = e.target.checked; saveSettings(); };
   $('#optLevel').value = S.level;
   $('#optLevel').onchange = (e) => { S.level = e.target.value; saveSettings(); };
   $('#optSound').onchange = (e) => { S.sound = e.target.checked; saveSettings(); if (S.sound) soundClack(); };

@@ -420,3 +420,25 @@ table.pts td .demo { margin: 0; padding: 4px; }
 #narrStatus button { margin: 4px 3px 0; padding: 6px 12px; }
 #btnUndo { background: #5d4037; }
 .lessonPicker { margin-top: 8px; font-size: .95em; }
+
+/* ---------- Personagens ---------- */
+.seat .avatar { width: 54px; height: 54px; border-radius: 50%; background: rgba(255,255,255,.12); overflow: hidden; flex: none; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.seat#seat2 .avatar { box-shadow: 0 0 0 3px #42a5f5, 0 2px 6px rgba(0,0,0,.35); }
+.seat#seat1 .avatar, .seat#seat3 .avatar { box-shadow: 0 0 0 3px #ef5350, 0 2px 6px rgba(0,0,0,.35); }
+.seat .avatar svg, .av-mini svg, .av-big svg { width: 100%; height: 100%; display: block; }
+.seat.turn .avatar { animation: bob 1s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-3px) scale(1.05); } }
+.av-mini { display: inline-block; width: 1.5em; height: 1.5em; vertical-align: middle; border-radius: 50%; background: rgba(255,255,255,.15); overflow: hidden; }
+.av-big { display: block; width: 56px; height: 56px; margin: 0 auto 4px; border-radius: 50%; background: rgba(255,255,255,.15); overflow: hidden; }
+@media (max-width: 600px) {
+  .seat .avatar { width: 40px; height: 40px; }
+  .seat.left .avatar, .seat.right .avatar { width: 32px; height: 32px; }
+  .seat.left, .seat.right { max-width: 38px; }
+}
+
+/* ---------- Rolar as pedras ---------- */
+#boardWrap { position: relative; }
+.shuffle { position: absolute; inset: 0; z-index: 6; cursor: pointer; }
+.shuffle .tile { --u: 12px; position: absolute; left: 0; top: 0; margin: -12px 0 0 -6px; }
+#table.dealing .seat .tiles { visibility: hidden; }
+#table.dealing .empty-board { visibility: hidden; }
