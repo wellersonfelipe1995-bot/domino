@@ -721,7 +721,7 @@ function miniTile(k) {
 
 /* ---------------- Jogada humana ---------------- */
 function humanTurn(moves) {
-  render();
+  // (a mesa já foi desenhada em nextTurn; desenhar de novo cortaria a pedra que está voando)
   const e = ends();
   let msg;
   if (!e) {
@@ -922,7 +922,7 @@ function render() {
     const el = $('#seat' + p);
     el.classList.toggle('turn', G.turn === p && !G.over);
     const nameCls = teamOf(p) === 0 ? 'us' : 'them';
-    const label = p === 0 ? 'Você' : `${SEAT[p]}<br><small>${ROLE[p]}</small>`;
+    const label = 'Você';
     let tiles;
     const hidden = p !== 0 && !(S.spy || G.over);
     if (p === 0) {
@@ -938,9 +938,19 @@ function render() {
       tiles = G.hands[p].map((t) => (S.spy || G.over ? T(t.a, t.b) : backHTML())).join('');
     }
     const lacks = [...G.lacks[p]].sort();
-    const chips = p === 0 ? '' : `<div class="chips">${lacks.map((n) => `<span class="chip no">sem ${n}</span>`).join('')}</div>`;
     const bubbles = [...el.querySelectorAll('.bubble')];
-    el.innerHTML = `${p === 0 ? '' : `<div class="avatar">${avatarSVG(p)}</div>`}<div class="name ${nameCls}">${label} · ${G.hands[p].length} ${G.hands[p].length === 1 ? "pedra" : "pedras"}</div><div class="tiles ${hidden ? 'backs' : ''}">${tiles}</div>${chips}`;
+    const n = G.hands[p].length;
+    if (p === 0) {
+      el.innerHTML = `<div class="name ${nameCls}">${label} · ${n} ${n === 1 ? 'pedra' : 'pedras'}</div><div class="tiles">${tiles}</div>`;
+    } else {
+      // Enxuto: boneco com o número de pedras no cantinho, o nome e o que ele não tem.
+      // As pedras só aparecem viradas para cima no modo espiar ou no fim da mão.
+      el.title = `${SEAT[p]} — ${p === 2 ? 'seu parceiro' : ROLE[p]} — ${n} ${n === 1 ? 'pedra' : 'pedras'}`;
+      el.innerHTML = `<div class="avatar-wrap"><div class="avatar">${avatarSVG(p)}</div><span class="count" title="${n} pedras na mão"><i></i>${n}</span></div>` +
+        `<div class="name ${nameCls}">${SEAT[p]}</div>` +
+        (hidden ? '' : `<div class="tiles">${tiles}</div>`) +
+        (lacks.length ? `<div class="chips"><span class="chip no" title="Não tem nenhuma pedra com ${lacks.join(', ')}">sem ${lacks.join(' ')}</span></div>` : '');
+    }
     bubbles.forEach((b) => el.appendChild(b));
   }
   document.querySelectorAll('#seat0 .tile').forEach((el) => {
@@ -1171,14 +1181,20 @@ function renderBoard() {
     const endAttr = sides.length ? ` data-end="${sides.join(' ')}"` : '';
     html += `<div class="bt${sides.length ? ' endtile' : ''}${choose ? ' choose' : ''}"${endAttr} style="left:${px(it.x)}px;top:${py(it.y)}px">${boardTileHTML(it, cls)}</div>`;
   }
-  const flying = G.animEntry && S.anim && G.flyFrom ? lay.items.findIndex((it) => it.e === G.animEntry) : -1;
-  const from = G.flyFrom;
+  // Voo da pedra recém-jogada. Se a mesa for redesenhada no meio do voo,
+  // ele continua de onde estava em vez de ser cortado.
+  if (G.animEntry && S.anim && G.flyFrom) {
+    G.flight = { entry: G.animEntry, from: G.flyFrom, t0: performance.now(), spin: (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 120) };
+  }
+  const fl = G.flight;
+  const flying = fl && performance.now() - fl.t0 < FLY_MS ? lay.items.findIndex((it) => it.e === fl.entry) : -1;
+  if (flying < 0) G.flight = null;
   G.animEntry = null;
   G.flyFrom = null;
   board.style.setProperty('--u', u + 'px');
   board.style.height = (maxY - minY) * u + 2 * pad + 'px';
   board.innerHTML = html;
-  if (flying >= 0) flyTile(board.querySelectorAll('.bt')[flying], from);
+  if (flying >= 0) flyTile(board.querySelectorAll('.bt')[flying], fl.from, performance.now() - fl.t0, fl.spin);
   board.querySelectorAll('.bt.choose').forEach((el) => {
     el.onclick = () => {
       const m = selOpts.find((o) => el.dataset.end.split(' ').includes(o.side));
@@ -1199,19 +1215,20 @@ function seatPoint(p) {
   const tiles = document.querySelector(`#seat${p} .tiles`);
   return centerOf(tiles && tiles.children.length ? tiles : document.querySelector(`#seat${p} .avatar`)) || centerOf($('#seat' + p));
 }
-function flyTile(el, from) {
+const FLY_MS = 420;
+function flyTile(el, from, elapsed = 0, spin = 180) {
   if (!el || !from) return;
   const to = centerOf(el);
   if (!to) return;
   const dx = from.x - to.x;
   const dy = from.y - to.y;
-  const spin = (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 120);
   el.style.zIndex = 5;
   const a = el.animate([
     { transform: `translate(${dx}px, ${dy}px) rotate(${spin}deg) scale(1.15)` },
     { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 30}px) rotate(${spin * 0.3}deg) scale(1.25)`, offset: 0.55 },
     { transform: 'translate(0, 0) rotate(0) scale(1)' },
-  ], { duration: 420, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  ], { duration: FLY_MS, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  a.currentTime = elapsed;
   a.onfinish = () => { el.style.zIndex = ''; };
 }
 

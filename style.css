@@ -453,3 +453,25 @@ table.pts td .demo { margin: 0; padding: 4px; }
 @keyframes dance { from { transform: rotate(-12deg) translateY(0); } to { transform: rotate(12deg) translateY(-8px); } }
 .smug { animation: smug 1.6s ease-in-out infinite; }
 @keyframes smug { 50% { transform: rotate(-6deg); } }
+
+/* ---------- Jogadores enxutos: boneco + número de pedras + nome ---------- */
+.seat.top, .seat.left, .seat.right { border: 0; background: none; gap: 3px; padding: 2px; }
+.seat.top.turn, .seat.left.turn, .seat.right.turn { background: none; }
+.avatar-wrap { position: relative; }
+.seat .avatar-wrap .count {
+  position: absolute; right: -6px; bottom: -4px;
+  display: inline-flex; align-items: center; gap: 2px;
+  background: #11151a; color: #fff; font-weight: 800; font-size: 12px;
+  border-radius: 10px; padding: 1px 5px 1px 3px; border: 1px solid #555;
+}
+.seat .avatar-wrap .count i { display: inline-block; width: 6px; height: 11px; border-radius: 2px; background: repeating-linear-gradient(45deg, #1e3a6e, #1e3a6e 2px, #274b8a 2px, #274b8a 4px); border: 1px solid #8aa; }
+.seat.turn .avatar { box-shadow: 0 0 0 4px #ffd54f, 0 0 16px #ffd54f !important; }
+.seat:not(.bottom) .name { font-size: .85em; line-height: 1.1; text-align: center; }
+.seat .chip.no { white-space: nowrap; }
+@media (max-width: 600px) {
+  .seat.left, .seat.right { max-width: 50px; justify-content: center; }
+  .seat.left .name, .seat.right .name { writing-mode: vertical-rl; font-size: .95em; }
+  .seat.left .chip, .seat.right .chip { writing-mode: horizontal-tb; padding: 1px 4px; font-size: .85em; white-space: normal; text-align: center; }
+  .seat .avatar, .seat.left .avatar, .seat.right .avatar { width: 40px; height: 40px; }
+  .seat.top { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 8px; }
+}
