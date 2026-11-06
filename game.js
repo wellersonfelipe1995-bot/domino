@@ -70,7 +70,7 @@ function loadSettings() {
   try { return JSON.parse(localStorage.getItem('domino-settings') || '{}'); } catch (e) { return {}; }
 }
 const S = Object.assign(
-  { professor: true, spy: false, colors: true, pace: 'passo', sound: true, lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
+  { professor: true, spy: false, colors: true, pace: 'passo', sound: true, level: 'facil', lessonDone: -1, doubleName: 'carrao', customName: '', customGender: 'o' },
   loadSettings()
 );
 function saveSettings() {
@@ -214,7 +214,8 @@ function newHand() {
         : `Quem ganhou a mão anterior começa com qualquer pedra: <b>${SEAT[start]}</b>.`),
     'tip'
   );
-  narrate(`🃏 <b>Mão ${G.handNo}</b> começou: cada um tem 7 pedras. Quem começa: <b>${SEAT[start]}</b>.`);
+  narrate(`🃏 <b>Mão ${G.handNo}</b> começou: cada um tem 7 pedras. Quem começa: <b>${SEAT[start]}</b>.` +
+    (G.handNo === 1 ? `<br><small>Adversários no nível <b>${(LEVELS[S.level] || LEVELS.facil).name}</b> (muda em ⚙️ Opções).</small>` : ''));
   nextTurn();
 }
 
@@ -394,6 +395,18 @@ function evaluate(p) {
 }
 
 /* ---------------- Fluxo da partida ---------------- */
+/* Nível dos adversários (o parceiro joga sempre bem, para ajudar você):
+   fácil = qualquer pedra que encaixa; médio = metade das vezes a melhor jogada;
+   difícil = sempre a melhor jogada. Calibrado em simulação: um iniciante vence
+   ~70% das partidas no fácil, ~50% no médio e ~35% no difícil. */
+const LEVELS = { facil: { name: 'Fácil', skill: 0 }, medio: { name: 'Médio', skill: 0.5 }, dificil: { name: 'Difícil', skill: 1 } };
+function botMove(p, moves) {
+  const skill = teamOf(p) === 1 ? (LEVELS[S.level] || LEVELS.facil).skill : 1;
+  if (Math.random() >= skill) return moves[Math.floor(Math.random() * moves.length)];
+  const ev = evaluate(p).map((e) => ({ ...e, s: e.s + Math.random() * 1.2 })).sort((x, y) => y.s - x.s);
+  return ev[0].m;
+}
+
 function botDelay() { return S.pace === 'passo' ? 700 : +S.pace || 1300; }
 
 function nextTurn() {
@@ -408,8 +421,7 @@ function nextTurn() {
     if (g !== gen || G.over) return;
     if (!moves.length) doPass(p);
     else {
-      const ev = evaluate(p).map((e) => ({ ...e, s: e.s + Math.random() * 1.2 })).sort((x, y) => y.s - x.s);
-      doPlay(p, ev[0].m);
+      doPlay(p, botMove(p, moves));
     }
   }, botDelay());
 }
@@ -709,7 +721,15 @@ function endHand(r) {
   if (gameOver) {
     const won = G.score[0] >= TARGET;
     title = won ? '🏆 Vocês venceram a partida!' : '😤 Os adversários venceram a partida';
-    body = body + (won ? '<p>Parabéns! Agora tente jogar com o professor desligado.</p>' : '<p>Não desanime: veja as dicas do professor e tente de novo!</p>');
+    const lv = LEVELS[S.level] || LEVELS.facil;
+    const up = { facil: 'medio', medio: 'dificil' }[S.level];
+    const down = { dificil: 'medio', medio: 'facil' }[S.level];
+    body += `<p>Nível dos adversários: <b>${lv.name}</b>.</p>`;
+    body += won
+      ? (up ? `<p>Parabéns! Que tal subir para o nível <b>${LEVELS[up].name}</b>?</p><button class="big" id="mLevel" data-l="${up}">⬆️ Jogar no ${LEVELS[up].name}</button>`
+            : '<p>Parabéns! Você venceu no nível mais difícil. Agora tente com o professor desligado.</p>')
+      : (down ? `<p>Não desanime! Se quiser, treine no nível <b>${LEVELS[down].name}</b> e volte depois.</p><button class="big" id="mLevel" data-l="${down}">⬇️ Jogar no ${LEVELS[down].name}</button>`
+              : '<p>Não desanime: veja as dicas do professor e tente de novo!</p>');
   }
   G.gameOver = gameOver;
   G.lastModal = `<h2>${title}</h2>${body}<div class="btns"><button class="big primary" id="mNext">${gameOver ? 'Nova partida' : 'Próxima mão ▶'}</button></div>`;
@@ -719,6 +739,8 @@ function endHand(r) {
 
 function bindEndButton() {
   $('#mNext').onclick = () => { hideModal(); if (G.gameOver) newGame(); else newHand(); };
+  const ml = $('#mLevel');
+  if (ml) ml.onclick = () => { S.level = ml.dataset.l; saveSettings(); $('#optLevel').value = S.level; hideModal(); newGame(); };
 }
 
 /* ---------------- Interface ---------------- */
@@ -1249,6 +1271,7 @@ const LESSONS = [
         <li><b>🕵️ Leitura dos jogadores</b> — o que cada um não tem (pelos passes) e as pedras que dá para deduzir.</li>
         <li><b>⚠️ O que os adversários sabem de você</b> — veja o que você está entregando!</li>
         <li><b>Para jogar</b>, arraste a sua pedra até a ponta onde quer jogar (a pedra da ponta cresce quando você chega perto) ou simplesmente toque nela.</li>
+        <li><b>🎯 Nível dos adversários</b> — comece no <b>Fácil</b>; quando estiver ganhando, suba para Médio e Difícil (o Difícil joga como gente experiente).</li>
         <li><b>⚙️ Opções</b> — ligue o <b>modo espiar</b> para ver as pedras de todos e entender as jogadas dos robôs. Quando estiver confiante, <b>desligue o professor</b>.</li>
       </ul>
       <p>Na mesa, cada pedra ganha um tom bem clarinho de quem jogou:</p>
@@ -1352,6 +1375,8 @@ function initUI() {
   $('#optSpy').checked = S.spy;
   $('#optColors').checked = S.colors;
   $('#optSound').checked = S.sound;
+  $('#optLevel').value = S.level;
+  $('#optLevel').onchange = (e) => { S.level = e.target.value; saveSettings(); };
   $('#optSound').onchange = (e) => { S.sound = e.target.checked; saveSettings(); if (S.sound) soundClack(); };
   $('#optSpeed').value = String(S.pace);
   $('#optProfessor').onchange = (e) => { S.professor = e.target.checked; saveSettings(); render(); };
