@@ -264,6 +264,8 @@ function newHand() {
   G.board = [];
   G.origin = 0; // índice da primeira pedra jogada (o centro da mesa)
   G.lacks = [0, 1, 2, 3].map(() => new Set());
+  G.batida = null;
+  G.lastPasser = null;
   G.over = false;
   G.selected = null;
   G.suggest = null;
@@ -544,8 +546,45 @@ function botMove(p, moves) {
 
 function botDelay() { return S.pace === 'passo' ? 700 : +S.pace || 1300; }
 
+/* ---------------- Quem está "na batida" ----------------
+   É quem acaba as pedras primeiro se, daqui pra frente, ninguém passar.
+   Cada jogador ainda precisa de (pedras - 1) voltas completas mais a sua posição
+   na ordem a partir de quem joga agora; quem precisar de menos jogadas está na batida.
+   Quem sai começa na batida; quando ele passa, a batida vai para o próximo. */
+function whoIsNaBatida() {
+  let best = null;
+  for (let p = 0; p < 4; p++) {
+    const n = G.hands[p].length;
+    if (!n) continue;
+    const steps = (n - 1) * 4 + ((p - G.turn + 4) % 4);
+    if (!best || steps < best.steps) best = { p, steps };
+  }
+  return best ? best.p : null;
+}
+
+function checkBatida() {
+  const b = whoIsNaBatida();
+  if (b === G.batida) return;
+  const before = G.batida;
+  G.batida = b;
+  const who = b === 0 ? '<b>Você está na batida</b>' : `${avatarMini(b)} <b>${SEAT[b]}</b> está na batida`;
+  let why;
+  if (before == null) why = b === 0 ? 'você sai jogando' : `${PRON[b]} sai jogando`;
+  else if (G.lastPasser != null) why = `${G.lastPasser === 0 ? 'você passou' : SEAT[G.lastPasser] + ' passou'} e perdeu a vez`;
+  else why = 'a vez andou';
+  let msg = `🎯 ${who} (${why}): se ninguém passar, ${b === 0 ? 'você é' : 'é'} o primeiro a acabar as pedras.`;
+  if (S.professor) {
+    if (teamOf(b) === 1) msg += ' Para tirar a batida dele, faça-o <b>passar</b>: deixe nas pontas números que ele não tem.';
+    else if (b === 0) msg += ' Segure a batida: evite passar, mantendo números variados na mão.';
+    else msg += ' É o seu parceiro: ajude-o deixando nas pontas os números que ele joga.';
+  }
+  say(msg, 'tip');
+}
+
 function nextTurn() {
   if (G.over) return;
+  checkBatida();
+  G.lastPasser = null;
   render();
   const p = G.turn;
   const moves = legal(p);
@@ -564,6 +603,8 @@ function nextTurn() {
 function advance() {
   const prev = G.turn;
   G.turn = (G.turn + 1) % 4;
+  checkBatida();
+  G.lastPasser = null;
   // No modo passo a passo, entre duas jogadas dos outros há 3 segundos para ler o que
   // aconteceu. Dá para pausar ou seguir na hora.
   if (S.pace === 'passo' && prev !== 0 && G.turn !== 0) {
@@ -685,6 +726,7 @@ function doPass(p) {
   const nums = [...new Set([L, R])];
   const fresh = nums.filter((n) => !G.lacks[p].has(n));
   nums.forEach((n) => G.lacks[p].add(n));
+  G.lastPasser = p;
   bubble(p, 'PASSOU!');
   soundKnock();
   narrate(`✋ ${p === 0 ? '' : avatarMini(p) + ' '}<b>${p === 0 ? 'Você passou' : SEAT[p] + ' passou'}</b> — ${PRON[p]} não tem nenhuma pedra com ${listNums(nums)}.`);
@@ -982,13 +1024,14 @@ function render() {
     const bubbles = [...el.querySelectorAll('.bubble')];
     const n = G.hands[p].length;
     if (p === 0) {
-      el.innerHTML = `<div class="name ${nameCls}">${label} · ${n} ${n === 1 ? 'pedra' : 'pedras'}</div><div class="tiles">${tiles}</div>`;
+      el.innerHTML = `<div class="name ${nameCls}">${label} · ${n} ${n === 1 ? 'pedra' : 'pedras'}${G.batida === 0 && !G.over ? ' <span class="batida-tag" title="Se ninguém passar, você é o primeiro a acabar as pedras">🎯 na batida</span>' : ''}</div><div class="tiles">${tiles}</div>`;
     } else {
       // Enxuto: boneco com o número de pedras no cantinho, o nome e o que ele não tem.
       // As pedras só aparecem viradas para cima no modo espiar ou no fim da mão.
       el.title = `${SEAT[p]} — ${p === 2 ? 'seu parceiro' : ROLE[p]} — ${n} ${n === 1 ? 'pedra' : 'pedras'}`;
       el.innerHTML = `<button type="button" class="name editname ${nameCls}" data-p="${p}" title="Toque para mudar o nome">${escapeHTML(SEAT[p])}</button>` +
         `<div class="avatar-wrap"><div class="avatar">${avatarSVG(p)}</div><span class="count" title="${n} pedras na mão"><i></i>${n}</span></div>` +
+        (G.batida === p && !G.over ? '<span class="batida-tag" title="Se ninguém passar, é o primeiro a acabar as pedras">🎯 na batida</span>' : '') +
         `<div class="tiles ${hidden ? 'backs' : ''}">${tiles}</div>` +
         (lacks.length ? `<div class="chips"><span class="chip no" title="Não tem nenhuma pedra com ${lacks.join(', ')}">sem ${lacks.join(' ')}</span></div>` : '');
     }
@@ -1588,6 +1631,7 @@ const LESSONS = [
         <li><b>Livre-se das pedras pesadas</b> (6-6, 5-6, 5-5…). Se o jogo trancar, quem tem mais pontos na mão perde.</li>
         <li><b>Mantenha variedade.</b> Quanto mais números diferentes na mão, menos você passa.</li>
         <li><b>Faça o adversário passar.</b> Se o próximo adversário já passou no 3, tente deixar 3 nas pontas.</li>
+        <li><b>Saiba quem está na batida.</b> Quem sai começa "na batida": se ninguém passar, é o primeiro a acabar as pedras. Cada vez que ele passa, a batida vai para o próximo. Se um adversário está na batida, faça ele passar; se é você ou o parceiro, segure! O jogo mostra a etiqueta 🎯 <b>na batida</b>.</li>
         <li><b>Ajude o parceiro.</b> Repare nos números que ele joga e deixe esses números nas pontas. Não "mate" o número dele.</li>
         <li><b>Conte sempre</b> quantas pedras de cada número já saíram.</li>
         <li><b>Antes de trancar o jogo, some!</b> Só tranque se a sua dupla tiver menos pontos.</li>

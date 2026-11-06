@@ -500,3 +500,11 @@ table.pts td .demo { margin: 0; padding: 4px; }
 .nameEditBox input { font: inherit; font-size: 1.2em; padding: 8px 10px; border-radius: 10px; border: 2px solid #42a5f5; text-align: center; }
 .nameEditBox .btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .seat .editname::after { content: " ✎"; font-size: .85em; opacity: .55; }
+
+/* Etiqueta de quem está na batida */
+.batida-tag {
+  display: inline-block; background: #ffd54f; color: #3e2a00; font-weight: 800;
+  font-size: .72rem; border-radius: 10px; padding: 1px 6px; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,.4); writing-mode: horizontal-tb;
+}
+.seat:not(.bottom) .batida-tag { margin-top: 2px; }
