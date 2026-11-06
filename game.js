@@ -638,8 +638,11 @@ function doPlay(p, m) {
   else if (m.side === 'L') { G.board.unshift((entry = { a: otherSide(t, prev[0]), b: prev[0], p })); G.origin++; }
   else G.board.push((entry = { a: prev[1], b: otherSide(t, prev[1]), p }));
   G.lastEntry = entry;
-  soundClack(p === 0 ? 1 : 0.8);
   G.animEntry = entry;
+  // A pedra sai voando da mão de quem jogou; o "tec" toca quando ela encosta na mesa.
+  G.flyFrom = p === 0 ? (G.flyFrom || handPoint(tid(t))) : seatPoint(p);
+  if (S.anim && G.flyFrom) setTimeout(() => soundClack(p === 0 ? 1 : 0.8), 380);
+  else soundClack(p === 0 ? 1 : 0.8);
   const now = ends();
   const who = p === 0 ? '<b>Você</b> jogou' : `${avatarMini(p)} <b>${SEAT[p]}</b> jogou`;
   narrate(prev
@@ -761,6 +764,7 @@ function onHandClick(id) {
 }
 
 function humanPlay(m) {
+  if (!G.flyFrom) G.flyFrom = handPoint(tid(m.t));
   takeSnapshot();
   const ev = evaluate(0);
   const best = ev[0];
@@ -845,7 +849,10 @@ function endHand(r) {
   const gameOver = G.score[0] >= TARGET || G.score[1] >= TARGET;
   if (gameOver) {
     const won = G.score[0] >= TARGET;
-    title = won ? '🏆 Vocês venceram a partida!' : '😤 Os adversários venceram a partida';
+    title = won ? '🏆 Vocês venceram a partida!' : '😏 Os adversários venceram a partida';
+    body = (won
+      ? `<div class="party"><span class="av-big dance">${avatarSVG(2)}</span><span class="party-txt">🎉🥳🎉</span></div><p><b>É festa!</b> Você e o Tonhão levaram a partida!</p>`
+      : `<div class="party lose"><span class="av-big smug">${avatarSVG(1)}</span><span class="av-big smug">${avatarSVG(3)}</span></div><p>Seu Zé e Dona Cida comemoram… mas a revanche é sua! 😉</p>`) + body;
     const lv = LEVELS[S.level] || LEVELS.facil;
     const up = { facil: 'medio', medio: 'dificil' }[S.level];
     const down = { dificil: 'medio', medio: 'facil' }[S.level];
@@ -858,8 +865,17 @@ function endHand(r) {
   }
   G.gameOver = gameOver;
   G.lastModal = `<h2>${title}</h2>${body}<div class="btns"><button class="big primary" id="mNext">${gameOver ? 'Nova partida' : 'Próxima mão ▶'}</button></div>`;
-  showModal(G.lastModal);
-  bindEndButton();
+  const show = () => {
+    showModal(G.lastModal);
+    bindEndButton();
+    if (gameOver && G.score[0] >= TARGET) { confetti(true); soundWin(true); }
+    else if (gameOver) soundLose();
+    else if (winTeam === 0) { confetti(false); soundWin(false); }
+  };
+  // espera a última pedra pousar na mesa antes de mostrar o resultado
+  const g = gen;
+  if (S.anim) setTimeout(() => { if (g === gen) show(); }, 700);
+  else show();
 }
 
 function bindEndButton() {
@@ -1049,12 +1065,15 @@ function finishDrag(dropped) {
   if (!d.started) return;
   dragJustEnded = true;
   setTimeout(() => { dragJustEnded = false; }, 50);
+  const gr = d.ghost.getBoundingClientRect();
+  G.flyFrom = { x: gr.left + gr.width / 2, y: gr.top + gr.height / 2 };
   d.ghost.remove();
   d.el.classList.remove('dragging');
   $('#board').classList.remove('droparea', 'hover');
   document.querySelectorAll('#board .endtile').forEach((el) => { el.classList.remove('drop', 'target'); el.style.transform = ''; });
   if (!dropped || G.over || G.turn !== 0) return;
   if (d.target && !d.target.near) { humanPlay(d.target.m); return; }
+  G.flyFrom = null;
   if (!d.opts.length) { onHandClick(d.id); return; }
   setProfNow('Quase! Leve a pedra <b>até a mesa</b>, perto da ponta onde você quer jogar — a pedra da ponta cresce quando você está chegando.');
 }
@@ -1146,22 +1165,151 @@ function renderBoard() {
   for (const it of lay.items) {
     let cls = `p${it.e.p} ${teamOf(it.e.p) === 0 ? 'us' : 'them'}`;
     if (it.e === G.lastEntry) cls += ' last';
-    if (it.e === G.animEntry) cls += ' enter';
+    if (it.e === G.animEntry && !(S.anim && G.flyFrom)) cls += ' enter';
     const sides = [it === lay.endItemL ? 'L' : '', it === lay.endItemR ? 'R' : ''].filter(Boolean);
     const choose = sides.some((sd) => selOpts.some((m) => m.side === sd));
     const endAttr = sides.length ? ` data-end="${sides.join(' ')}"` : '';
     html += `<div class="bt${sides.length ? ' endtile' : ''}${choose ? ' choose' : ''}"${endAttr} style="left:${px(it.x)}px;top:${py(it.y)}px">${boardTileHTML(it, cls)}</div>`;
   }
+  const flying = G.animEntry && S.anim && G.flyFrom ? lay.items.findIndex((it) => it.e === G.animEntry) : -1;
+  const from = G.flyFrom;
   G.animEntry = null;
+  G.flyFrom = null;
   board.style.setProperty('--u', u + 'px');
   board.style.height = (maxY - minY) * u + 2 * pad + 'px';
   board.innerHTML = html;
+  if (flying >= 0) flyTile(board.querySelectorAll('.bt')[flying], from);
   board.querySelectorAll('.bt.choose').forEach((el) => {
     el.onclick = () => {
       const m = selOpts.find((o) => el.dataset.end.split(' ').includes(o.side));
       if (m) humanPlay(m);
     };
   });
+}
+
+/* ---------------- Pedra voando da mão até a mesa ---------------- */
+function centerOf(el) {
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  if (!r.width && !r.height) return null;
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+function handPoint(id) { return centerOf(document.querySelector(`#seat0 .tile[data-id="${id}"]`)); }
+function seatPoint(p) {
+  const tiles = document.querySelector(`#seat${p} .tiles`);
+  return centerOf(tiles && tiles.children.length ? tiles : document.querySelector(`#seat${p} .avatar`)) || centerOf($('#seat' + p));
+}
+function flyTile(el, from) {
+  if (!el || !from) return;
+  const to = centerOf(el);
+  if (!to) return;
+  const dx = from.x - to.x;
+  const dy = from.y - to.y;
+  const spin = (Math.random() < 0.5 ? -1 : 1) * (120 + Math.random() * 120);
+  el.style.zIndex = 5;
+  const a = el.animate([
+    { transform: `translate(${dx}px, ${dy}px) rotate(${spin}deg) scale(1.15)` },
+    { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 30}px) rotate(${spin * 0.3}deg) scale(1.25)`, offset: 0.55 },
+    { transform: 'translate(0, 0) rotate(0) scale(1)' },
+  ], { duration: 420, easing: 'cubic-bezier(.3,.7,.4,1)' });
+  a.onfinish = () => { el.style.zIndex = ''; };
+}
+
+/* ---------------- Festa (e o contrário) ---------------- */
+function confetti(big) {
+  const c = document.createElement('canvas');
+  c.className = 'confetti';
+  document.body.appendChild(c);
+  const dpr = window.devicePixelRatio || 1;
+  const W = innerWidth;
+  const H = innerHeight;
+  c.width = W * dpr;
+  c.height = H * dpr;
+  const ctx = c.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const colors = ['#ffd54f', '#42a5f5', '#66bb6a', '#ef5350', '#ab47bc', '#ffffff', '#ff9800'];
+  const n = big ? 240 : 90;
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const fromSides = big && i % 2;
+    parts.push({
+      x: fromSides ? (i % 4 === 1 ? -10 : W + 10) : W / 2 + (Math.random() - 0.5) * 80,
+      y: fromSides ? H * (0.3 + Math.random() * 0.4) : H * 0.35,
+      vx: fromSides ? (i % 4 === 1 ? 1 : -1) * (4 + Math.random() * 7) : (Math.random() - 0.5) * 14,
+      vy: -(6 + Math.random() * 9),
+      r: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.4,
+      w: 6 + Math.random() * 6,
+      h: 4 + Math.random() * 6,
+      color: colors[i % colors.length],
+    });
+  }
+  const dur = big ? 4500 : 2300;
+  const t0 = performance.now();
+  const step = (now) => {
+    const t = now - t0;
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalAlpha = Math.min(1, (dur - t) / 600);
+    for (const q of parts) {
+      q.vy += 0.28;
+      q.vx *= 0.99;
+      q.x += q.vx;
+      q.y += q.vy;
+      q.r += q.vr;
+      ctx.save();
+      ctx.translate(q.x, q.y);
+      ctx.rotate(q.r);
+      ctx.fillStyle = q.color;
+      ctx.fillRect(-q.w / 2, -q.h / 2, q.w, q.h * Math.abs(Math.cos(q.r * 2)));
+      ctx.restore();
+    }
+    if (t < dur) requestAnimationFrame(step);
+    else c.remove();
+  };
+  requestAnimationFrame(step);
+}
+
+function note(ctx, at, freq, dur, type, gain) {
+  const o = ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, at);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, at);
+  g.gain.exponentialRampToValueAtTime(gain, at + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  o.connect(g).connect(ctx.destination);
+  o.start(at);
+  o.stop(at + dur + 0.05);
+  return o;
+}
+
+// musiquinha de vitória (curtinha numa mão, completa na partida)
+function soundWin(big) {
+  const ctx = audio();
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime + 0.05;
+    const seq = big
+      ? [[523, 0, 0.15], [659, 0.15, 0.15], [784, 0.3, 0.15], [1047, 0.45, 0.35], [784, 0.85, 0.15], [1047, 1.0, 0.6]]
+      : [[659, 0, 0.12], [784, 0.12, 0.12], [1047, 0.24, 0.3]];
+    for (const [f, dt, d] of seq) {
+      note(ctx, t + dt, f, d, 'triangle', 0.28);
+      note(ctx, t + dt, f * 2, d * 0.7, 'sine', 0.06);
+    }
+    if (big) for (let k = 0; k < 6; k++) noiseBurst(ctx, t + 1.0 + k * 0.09, 0.05, 1800 + k * 300, 1, 0.12); // palminhas
+  } catch (e) { /* sem som, tudo bem */ }
+}
+
+// "uó-uó" discreto quando perde a partida
+function soundLose() {
+  const ctx = audio();
+  if (!ctx) return;
+  try {
+    const t = ctx.currentTime + 0.05;
+    [[392, 0], [370, 0.32], [349, 0.64]].forEach(([f, dt]) => note(ctx, t + dt, f, 0.3, 'triangle', 0.12));
+    const o = note(ctx, t + 0.96, 330, 0.7, 'triangle', 0.12);
+    o.frequency.linearRampToValueAtTime(300, t + 1.6);
+  } catch (e) { /* sem som, tudo bem */ }
 }
 
 function renderCounter() {

@@ -442,3 +442,14 @@ table.pts td .demo { margin: 0; padding: 4px; }
 .shuffle .tile { --u: 12px; position: absolute; left: 0; top: 0; margin: -12px 0 0 -6px; }
 #table.dealing .seat .tiles { visibility: hidden; }
 #table.dealing .empty-board { visibility: hidden; }
+
+/* ---------- Festa ---------- */
+.confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 100; }
+.party { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 4px 0 8px; }
+.party .av-big { width: 84px; height: 84px; margin: 0; box-shadow: 0 0 0 4px #42a5f5; }
+.party.lose .av-big { width: 64px; height: 64px; box-shadow: 0 0 0 3px #ef5350; }
+.party-txt { font-size: 2em; animation: bob .6s ease-in-out infinite; }
+.dance { animation: dance .5s ease-in-out infinite alternate; }
+@keyframes dance { from { transform: rotate(-12deg) translateY(0); } to { transform: rotate(12deg) translateY(-8px); } }
+.smug { animation: smug 1.6s ease-in-out infinite; }
+@keyframes smug { 50% { transform: rotate(-6deg); } }
