@@ -27,3 +27,18 @@ Basta abrir o arquivo `index.html` no navegador (computador ou celular). Não pr
 - Batida simples = 1 ponto, carrão = 2, lá-e-lô = 3, cruzada = 4.
 - Jogo trancado: a dupla com menos pontos na mão ganha 1 ponto.
 - A partida vai até 6 pontos.
+
+## Instalar como app (PWA)
+
+O jogo é um **PWA**: quando publicado num site com `https`, o celular oferece
+"Instalar app" (ou o botão **📲 Instalar** aparece no topo). Instalado, ele ganha
+ícone na tela inicial, abre em tela cheia e **funciona sem internet**.
+
+Arquivos do PWA: `manifest.webmanifest` (nome, cores e ícones), `sw.js` (guarda os
+arquivos para usar offline) e a pasta `icons/`.
+
+Ao publicar uma versão nova, mude `VERSION` em `sw.js` (ex.: `domino-v2`) para os
+aparelhos baixarem a atualização.
+
+Para gerar um **APK** para Android a partir do site publicado, dá para usar o
+[PWABuilder](https://www.pwabuilder.com/): cole o endereço do site e baixe o pacote Android.

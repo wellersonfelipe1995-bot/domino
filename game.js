@@ -1791,3 +1791,29 @@ function initUI() {
 }
 
 initUI();
+
+/* ---------------- App instalável (PWA) ----------------
+   Quando o jogo está publicado num site (https), ele funciona sem internet e o
+   celular oferece "Instalar". Aqui guardamos esse convite para mostrar o botão
+   📲 Instalar no topo. Dentro de páginas que não permitem isso, nada acontece. */
+(function setupPWA() {
+  const ok = 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+  if (ok) {
+    try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* sem PWA aqui */ }
+  }
+  let promptEvent = null;
+  const btn = $('#btnInstall');
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    promptEvent = e;
+    btn.classList.remove('hidden');
+  });
+  btn.onclick = async () => {
+    if (!promptEvent) return;
+    promptEvent.prompt();
+    try { await promptEvent.userChoice; } catch (e) { /* ok */ }
+    promptEvent = null;
+    btn.classList.add('hidden');
+  };
+  window.addEventListener('appinstalled', () => btn.classList.add('hidden'));
+})();
